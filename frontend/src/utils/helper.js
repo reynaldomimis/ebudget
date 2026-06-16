@@ -12,8 +12,8 @@ export const programMap = {
   ],
 };
 
-// List of division names
-export const divisionNames = [
+// List of office names
+export const officeNames = [
   "AD",
   "OED",
   "DED-TS",
@@ -64,7 +64,7 @@ export const getKeyFromLabel = (label) => {
 export const columnConfig = [
   {
     key: "division",
-    label: "DIVISION",
+    label: "OFFICE",
     width: "65px",
     align: "center",
     textColor: "red",

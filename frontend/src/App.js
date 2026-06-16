@@ -4,9 +4,11 @@ import Login from "./components/Login";
 import Sidebar from "./components/Sidebar";
 import ImportWFP from "./components/ImportWFP";
 import Records from "./components/Records";
+import Activities from "./components/Activities";
 import Summary from "./components/Summary";
 import { ToastContainer } from "react-toastify";
 import "./App.css";
+import BudgetForm from "./components/ui/BudgetForm";
 
 function AppContent() {
   const [activeComponent, setActiveComponent] = useState("import");
@@ -36,6 +38,10 @@ function AppContent() {
     switch (activeComponent) {
       case "import":
         return <ImportWFP />;
+      case "entries":
+        return <BudgetForm />;
+      case "activities":
+        return <Activities />;
       case "records":
         return <Records />;
       case "summary":
@@ -75,31 +81,6 @@ function AppContent() {
 }
 
 export default function App() {
-  // const testValues = [
-  //   "300.00",
-  //   "153.40",
-  //   "51.75",
-  //   "75.00",
-  //   "11.00",
-  //   "6.00",
-  //   "450.00",
-  //   "3,200.00",
-  //   "7.20",
-  //   "10.80",
-  //   "1,500.00",
-  //   "12,731.00",
-  //   "107.80",
-  //   "3,234.20",
-  //   "94,760.00",
-  // ];
-
-  // console.log("===== CONVERT TO THOUSANDS TEST =====");
-
-  // testValues.forEach((value) => {
-  //   const output = convertToThousands(value);
-  //   console.log(`${value}  →  ${output}`);
-  // });
-
   return (
     <AuthProvider>
       <AppContent />

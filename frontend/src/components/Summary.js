@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { prSoAPI, obligationAPI, activitiesAPI } from "../utils/api";
+import { prAPI, obligationAPI, activitiesAPI } from "../utils/api";
 import { formatPHP, formatDate } from "../utils/formatters";
 import Table from "./ui/Table";
 import Dropdown from "./ui/Dropdown";
-import { divisionNames, programMap } from "../utils/helper";
+import { officeNames, programMap } from "../utils/helper";
 import SummaryTable from "./ui/SummaryTable";
 import ActivitiesTable from "./ui/ActivitiesTable";
 
@@ -16,7 +16,7 @@ const Summary = () => {
   const [isLoading, setIsLoading] = useState(false);
 
   // --- Filter states
-  const [selectedDivision, setSelectedDivision] = useState("");
+  const [selectedOffice, setSelectedOffice] = useState("");
   const [selectedPapKey, setSelectedPapKey] = useState("");
   const [selectedPapValue, setSelectedPapValue] = useState("");
   const [selectedActivityItem, setSelectedActivityItem] = useState("");
@@ -59,7 +59,7 @@ const Summary = () => {
     setIsLoading(true);
     try {
       const [prSoRes, oblRes, nameRes, expenseRes] = await Promise.all([
-        prSoAPI.getActivity(),
+        prAPI.getWithBalance(),
         obligationAPI.getActivity(),
         activitiesAPI.getDistinctValues("ref_main_name"),
         activitiesAPI.getDistinctValues("expense_items"),
@@ -117,7 +117,7 @@ const Summary = () => {
   const filteredPrSoData = useMemo(() => {
     return prSoData.filter((row) => {
       return (
-        (!selectedDivision || row.division === selectedDivision) &&
+        (!selectedOffice || row.division === selectedOffice) &&
         (!selectedPapKey || row.pap_type === selectedPapKey) &&
         (!selectedPapValue || row.pap_des === selectedPapValue) &&
         (!selectedActivityItem || row.ref_main_name === selectedActivityItem) &&
@@ -136,7 +136,7 @@ const Summary = () => {
   const filteredObligationData = useMemo(() => {
     return obligationData.filter((row) => {
       return (
-        (!selectedDivision || row.division === selectedDivision) &&
+        (!selectedOffice || row.division === selectedOffice) &&
         (!selectedPapKey || row.pap_type === selectedPapKey) &&
         (!selectedPapValue || row.pap_des === selectedPapValue) &&
         (!selectedActivityItem || row.ref_main_name === selectedActivityItem) &&
@@ -151,7 +151,7 @@ const Summary = () => {
     selectedActivityItem,
     selectedExpenseItem,
   ]);
-  ``;
+
   // --- Totals for summary cards
   const filteredPrSoTotals = useMemo(() => {
     const totalAmountPR = filteredPrSoData.reduce(
@@ -225,7 +225,7 @@ const Summary = () => {
               setSelectedView(val);
 
               // Reset other filters when view changes
-              setSelectedDivision("");
+              setSelectedOffice("");
               setSelectedPapKey("");
               setSelectedPapValue("");
               setSelectedActivityItem("");
@@ -262,14 +262,14 @@ const Summary = () => {
             />
           )}
 
-          {/* Division dropdown */}
+          {/* Office dropdown */}
           <Dropdown
             options={[
-              { value: "", label: "Select Division" },
-              ...divisionNames.map((d) => ({ value: d, label: d })),
+              { value: "", label: "Select Office" },
+              ...officeNames.map((d) => ({ value: d, label: d })),
             ]}
-            value={selectedDivision}
-            onChange={setSelectedDivision}
+            value={selectedOffice}
+            onChange={setSelectedOffice}
             size="small"
           />
 
@@ -302,13 +302,13 @@ const Summary = () => {
 
       <div className="bg-white rounded-lg shadow p-8 flex-1 overflow-auto flex flex-col items-center">
         {selectedView === "SUMMARY" &&
-          !selectedDivision &&
+          !selectedOffice &&
           !selectedActivityItem &&
           !selectedExpenseItem && (
             <>
               {renderSummaryView()}
               <SummaryTable
-                division={selectedDivision}
+                office={selectedOffice}
                 papType={selectedPapKey}
                 papDes={selectedPapValue}
                 expenseItem={selectedExpenseItem}
@@ -317,10 +317,10 @@ const Summary = () => {
           )}
 
         {selectedView === "SUMMARY" &&
-          (selectedDivision || selectedActivityItem || selectedExpenseItem) && (
+          (selectedOffice || selectedActivityItem || selectedExpenseItem) && (
             <>
               <ActivitiesTable
-                division={selectedDivision}
+                office={selectedOffice}
                 papType={selectedPapKey}
                 papDes={selectedPapValue}
                 activitiesItem={selectedActivityItem}

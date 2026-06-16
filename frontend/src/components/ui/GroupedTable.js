@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from "react";
 import Dropdown from "./Dropdown";
-import { columnConfig, divisionNames, programMap } from "../../utils/helper";
+import { columnConfig, officeNames, programMap } from "../../utils/helper";
 import { convertToThousands, formatPHP } from "../../utils/formatters";
 
 const GroupedTable = ({
@@ -8,6 +8,7 @@ const GroupedTable = ({
   tableLabel = "Table",
   interactive = false,
   onRowClick,
+  hideFilters = false,
 }) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [level1, setLevel1] = useState("");
@@ -19,7 +20,7 @@ const GroupedTable = ({
     let tempData = data;
     if (level1 === "Program" && mainProgram)
       tempData = tempData.filter((row) => row.pap_type === mainProgram);
-    if (level1 === "Division" && mainProgram)
+    if (level1 === "Office" && mainProgram)
       tempData = tempData.filter((row) => row.division === mainProgram);
     if (subProgram)
       tempData = tempData.filter((row) => row.pap_des === subProgram);
@@ -68,16 +69,16 @@ const GroupedTable = ({
           // Show all normal + subtotal rows
           flat.push(...normalRows);
           flat.push(...subtotalRows);
-        } else if (level1 === "Division") {
+        } else if (level1 === "Office") {
           // Show only normal rows; grand total added later
           flat.push(...normalRows);
         }
       });
 
-      // Add Grand Total row for Division view
-      if (level1 === "Division") {
-        const allRowsInDivision = Object.values(grouped[papType]).flat();
-        const totalFqSum = allRowsInDivision.reduce(
+      // Add Grand Total row for Office view
+      if (level1 === "Office") {
+        const allRowsInOffice = Object.values(grouped[papType]).flat();
+        const totalFqSum = allRowsInOffice.reduce(
           (acc, r) => acc + (Number(r.totalFq) || 0),
           0,
         );
@@ -163,12 +164,12 @@ const GroupedTable = ({
           </h2>
         )}
         {/* LEFT SIDE (filters) */}
-        {interactive && (
+        {interactive && !hideFilters && (
           <div className="flex flex-wrap gap-2">
             <Dropdown
               options={[
                 { value: "Program", label: "Program" },
-                { value: "Division", label: "Division" },
+                { value: "Office", label: "Office" },
               ]}
               value={level1}
               onChange={(val) => {
@@ -176,7 +177,7 @@ const GroupedTable = ({
                 setMainProgram("");
                 setSubProgram("");
               }}
-              placeholder="Select Program or Division"
+              placeholder="Select Program or Office"
               size="small"
             />
 
@@ -196,15 +197,15 @@ const GroupedTable = ({
               />
             )}
 
-            {level1 === "Division" && (
+            {level1 === "Office" && (
               <Dropdown
-                options={divisionNames.map((div) => ({
+                options={officeNames.map((div) => ({
                   value: div,
                   label: div,
                 }))}
                 value={mainProgram}
                 onChange={(val) => setMainProgram(val)}
-                placeholder="Select Division"
+                placeholder="Select Office"
               />
             )}
 
@@ -223,15 +224,17 @@ const GroupedTable = ({
         )}
 
         {/* RIGHT SIDE (search) */}
-        <div className="ml-auto">
-          <input
-            type="text"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Search..."
-            className="pl-3 pr-2 py-1.5 border border-gray-300 rounded-md text-sm w-44"
-          />
-        </div>
+        {!hideFilters && (
+          <div className="ml-auto">
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Search..."
+              className="pl-3 pr-2 py-1.5 border border-gray-300 rounded-md text-sm w-44"
+            />
+          </div>
+        )}
       </div>
 
       {/* TABLE */}

@@ -5,7 +5,7 @@ import { formatPHP, parsePHP } from "../../utils/formatters";
 const ActivitiesTable = ({
   papType = "",
   papDes = "",
-  division = "",
+  office = "",
   activitiesItem = "",
   expenseItem = "",
 }) => {
@@ -31,7 +31,7 @@ const ActivitiesTable = ({
   // Filter data based on props and search
   useEffect(() => {
     let temp = [...data];
-    if (division) temp = temp.filter((i) => i.division === division);
+    if (office) temp = temp.filter((i) => i.division === office);
     if (papType) temp = temp.filter((i) => i.pap_type === papType);
     if (papDes) temp = temp.filter((i) => i.pap_des === papDes);
 
@@ -52,7 +52,7 @@ const ActivitiesTable = ({
     }
     temp = temp.filter((i) => parsePHP(i.totalFq) > 0);
     setFilteredData(temp);
-  }, [division, activitiesItem, expenseItem, papType, papDes, data, search]);
+  }, [office, activitiesItem, expenseItem, papType, papDes, data, search]);
 
   const grandTotal = filteredData.reduce(
     (sum, item) => sum + parsePHP(item.totalFq),

@@ -3,7 +3,8 @@ import { useAuth } from "../context/AuthContext";
 import { FiLogOut } from "react-icons/fi";
 
 const menuItems = [
-  { id: "import", label: "Import WFP", icon: "📥", requiredRole: "User" },
+  { id: "import", label: "Import Plan", icon: "📥", requiredRole: "User" },
+  { id: "activities", label: "Activities", icon: "💰", requiredRole: "User" },
   { id: "records", label: "Records", icon: "📊", requiredRole: "Viewer" },
   { id: "summary", label: "Summary", icon: "📈", requiredRole: "Viewer" },
 ];

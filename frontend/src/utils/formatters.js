@@ -1,17 +1,16 @@
-// PHP Currency Formatting with PHP Symbol
-// export const formatPHP = (amount) => {
-//   const num = parseFloat(amount) || 0;
-//   return new Intl.NumberFormat('en-PH', {
-//     style: 'currency',
-//     currency: 'PHP',
-//     minimumFractionDigits: 2,
-//     maximumFractionDigits: 2
-//   }).format(num);
-// };
 export const formatPHP = (amount) => {
   const num = parseFloat(amount) || 0;
   return new Intl.NumberFormat("en-PH", {
     minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(num);
+};
+
+// Generic amount formatter with no decimals for whole numbers
+export const formatAmount = (amount) => {
+  const num = parseFloat(amount) || 0;
+  return new Intl.NumberFormat("en-PH", {
+    minimumFractionDigits: 0,
     maximumFractionDigits: 2,
   }).format(num);
 };

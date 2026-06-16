@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Button from "./Button";
 
 const SubmitPlanInfoModal = ({
@@ -8,14 +8,23 @@ const SubmitPlanInfoModal = ({
   submitDisabled = false,
   showCloseIcon = true,
   title = "Submit Plan Info",
+  initialAllotmentType = "MOOE",
 }) => {
   const [planName, setPlanName] = useState("");
-  const [planDate, setPlanDate] = useState("");
+  const [planDate, setPlanDate] = useState(new Date().toISOString().split('T')[0]);
+  const [allotmentType, setAllotmentType] = useState(initialAllotmentType);
+
+  // Sync state with prop when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      setAllotmentType(initialAllotmentType);
+      setPlanDate(new Date().toISOString().split('T')[0]);
+    }
+  }, [isOpen, initialAllotmentType]);
 
   const handleSubmit = () => {
-    onSubmit({ planName, planDate });
+    onSubmit({ planName, planDate, allotmentType });
     setPlanName("");
-    setPlanDate("");
   };
 
   if (!isOpen) return null;
@@ -37,24 +46,13 @@ const SubmitPlanInfoModal = ({
         <div className="mb-6 flex flex-col gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Plan Name
+              Title
             </label>
             <input
               type="text"
               value={planName}
               onChange={(e) => setPlanName(e.target.value)}
-              className="w-full border border-gray-300 rounded-md p-2 focus:outline-none focus:ring-2 focus:ring-green-500"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Plan Date
-            </label>
-            <input
-              type="date"
-              value={planDate}
-              onChange={(e) => setPlanDate(e.target.value)}
+              placeholder="Title"
               className="w-full border border-gray-300 rounded-md p-2 focus:outline-none focus:ring-2 focus:ring-green-500"
             />
           </div>
@@ -70,7 +68,7 @@ const SubmitPlanInfoModal = ({
             className="bg-green-600 hover:bg-green-700 text-white"
             disabled={submitDisabled || !planName || !planDate}
           >
-            Submit
+            Save
           </Button>
         </div>
       </div>

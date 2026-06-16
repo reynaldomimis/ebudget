@@ -15,7 +15,7 @@ const dbConfig = {
 // Create connection pool
 const pool = mysql.createPool(dbConfig);
 
-// Test database connection
+
 const testConnection = async () => {
   try {
     const connection = await pool.getConnection();

@@ -3,7 +3,7 @@ import { activitiesAPI } from "../../utils/api";
 import { getKeyFromLabel } from "../../utils/helper";
 
 const SummaryTable = ({
-  division = "",
+  office = "",
   papType = "",
   papDes = "",
   // expenseItem = "",
@@ -19,17 +19,13 @@ const SummaryTable = ({
 
         // --- Filter only if filter value exists
         const filtered = activities.filter((a) => {
-          const matchDivision =
-            !division || a.division?.toLowerCase() === division.toLowerCase();
+          const matchOffice =
+            !office || a.division?.toLowerCase() === office.toLowerCase();
           const matchPapType =
             !papType || a.pap_type?.toLowerCase() === papType.toLowerCase();
           const matchPapDes =
             !papDes || a.pap_des?.toLowerCase() === papDes.toLowerCase();
-          // const matchExpense =
-          //   !expenseItem ||
-          //   a.expense_items?.toLowerCase() === expenseItem.toLowerCase();
-          // return matchDivision && matchPapType && matchPapDes && matchExpense;
-          return matchDivision && matchPapType && matchPapDes;
+          return matchOffice && matchPapType && matchPapDes;
         });
 
         // --- Determine plan year
@@ -145,8 +141,7 @@ const SummaryTable = ({
     };
 
     fetchRecords();
-    // }, [division, papType, papDes, expenseItem]);
-  }, [division, papType, papDes]);
+  }, [office, papType, papDes]);
 
   return (
     <div className="bg-white rounded-lg shadow p-4 space-y-1 mb-6 w-full overflow-x-auto">
