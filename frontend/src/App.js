@@ -1,89 +1,40 @@
-import React, { useState, useEffect } from "react";
-import { AuthProvider, useAuth } from "./context/AuthContext";
-import Login from "./components/Login";
-import Sidebar from "./components/Sidebar";
-import ImportWFP from "./components/ImportWFP";
-import Records from "./components/Records";
-import Activities from "./components/Activities";
-import Summary from "./components/Summary";
+import React from "react";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import AppLayout from "./components/layout/AppLayout";
+import DashboardOverview from "./features/dashboard/DashboardOverview";
+import PAPRegistryList from "./features/budget-registry/PAPRegistryList";
+import PAPDetailView from "./features/budget-registry/PAPDetailView";
+import Obligations from "./features/transactions/Obligations";
+import ProcurementRequests from "./features/transactions/ProcurementRequests";
+import PAPUtilizationHeatmap from "./features/monitoring/PAPUtilizationHeatmap";
+import ImportCenter from "./features/admin/import/ImportCenter";
+import ReviewQueue from "./features/review/ReviewQueue";
+import ApprovalQueue from "./features/approval/ApprovalQueue";
+import Reports from "./features/reports/Reports";
+import AdminCenter from "./features/admin/AdminCenter";
 import { ToastContainer } from "react-toastify";
-import "./App.css";
-import BudgetForm from "./components/ui/BudgetForm";
-
-function AppContent() {
-  const [activeComponent, setActiveComponent] = useState("import");
-  const { isLoggedIn, isLoading, user } = useAuth();
-
-  useEffect(() => {
-    if (isLoggedIn && user) {
-      if (user.role === "Viewer") setActiveComponent("records");
-      else setActiveComponent("import");
-    }
-  }, [isLoggedIn, user]);
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <div className="spinner"></div>
-          <p className="mt-4 text-gray-600">Loading...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!isLoggedIn) return <Login />;
-
-  const renderComponent = () => {
-    switch (activeComponent) {
-      case "import":
-        return <ImportWFP />;
-      case "entries":
-        return <BudgetForm />;
-      case "activities":
-        return <Activities />;
-      case "records":
-        return <Records />;
-      case "summary":
-        return <Summary />;
-      default:
-        return <ImportWFP />;
-    }
-  };
-
-  return (
-    <div className="flex h-screen bg-gray-50 overflow-hidden">
-      {/* Sidebar */}
-      <Sidebar
-        activeComponent={activeComponent}
-        setActiveComponent={setActiveComponent}
-      />
-
-      {/* Main Content */}
-      <main className="flex-1 overflow-auto p-3 bg-green-50">
-        {renderComponent()}
-      </main>
-
-      {/* Toast notifications */}
-      <ToastContainer
-        position="top-right"
-        autoClose={3000}
-        hideProgressBar={false}
-        newestOnTop={false}
-        closeOnClick
-        rtl={false}
-        pauseOnFocusLoss
-        draggable
-        pauseOnHover
-      />
-    </div>
-  );
-}
+import 'react-toastify/dist/ReactToastify.css';
 
 export default function App() {
   return (
-    <AuthProvider>
-      <AppContent />
-    </AuthProvider>
+    <BrowserRouter>
+      <Routes>
+        <Route element={<AppLayout />}>
+          <Route index element={<Navigate to="/dashboard" replace />} />
+          <Route path="dashboard" element={<DashboardOverview />} />
+          <Route path="registry" element={<PAPRegistryList />} />
+          <Route path="pap-detail/:id" element={<PAPDetailView />} />
+          <Route path="create-pr" element={<ProcurementRequests />} />
+          <Route path="create-obligation" element={<Obligations />} />
+          <Route path="monitoring" element={<PAPUtilizationHeatmap />} />
+          <Route path="reports" element={<Reports />} />
+          <Route path="review-queue" element={<ReviewQueue />} />
+          <Route path="approval-queue" element={<ApprovalQueue />} />
+          <Route path="import" element={<ImportCenter />} />
+          <Route path="admin" element={<AdminCenter />} />
+        </Route>
+      </Routes>
+      <ToastContainer position="bottom-right" />
+    </BrowserRouter>
   );
 }
