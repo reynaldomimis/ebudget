@@ -1,102 +1,116 @@
-const PrModel = require("../models/prModel");
+const PRService = require("../services/prService");
+const SequenceEngine = require("../engines/SequenceEngine");
+const { handleError } = require("../utils/errorHandler");
 
 class PrController {
   static async create(req, res) {
     try {
-      const result = await PrModel.create(req.body);
+      const result = await PRService.createPR(req.body);
       res.status(201).json({
+        success: true,
         message: "PR record created successfully",
         data: { id: result.insertId, ...req.body }
       });
     } catch (error) {
-      res.status(500).json({ error: error.message });
+      handleError(error, res);
     }
   }
 
   static async getAll(req, res) {
     try {
-      const data = await PrModel.getAll();
-      res.json({ data });
+      const data = await PRService.getAllPRs();
+      res.json({ success: true, data });
     } catch (error) {
-      res.status(500).json({ error: error.message });
+      handleError(error, res);
     }
   }
 
-  static async getByActivitiesId(req, res) {
+  static async getByMOOEId(req, res) {
     try {
-      const data = await PrModel.getByActivitiesId(req.params.id || req.query.id);
-      res.json({ data });
+      const data = await PRService.getPRsByMOOE(req.params.id || req.query.id);
+      res.json({ success: true, data });
     } catch (error) {
-      res.status(500).json({ error: error.message });
+      handleError(error, res);
     }
   }
 
   static async update(req, res) {
     try {
       const { id } = req.params;
-      const result = await PrModel.update(id, req.body);
-      if (result.affectedRows === 0) {
-        return res.status(404).json({ error: "PR record not found" });
-      }
-      res.json({ message: "PR record updated successfully", data: { id, ...req.body } });
+      const result = await PRService.updatePR(id, req.body);
+      res.json({ success: true, message: "PR record updated successfully", data: { id, ...req.body } });
     } catch (error) {
-      res.status(500).json({ error: error.message });
+      handleError(error, res);
     }
   }
 
   static async delete(req, res) {
     try {
       const { id } = req.params;
-      const result = await PrModel.delete(id);
-      if (result.affectedRows === 0) {
-        return res.status(404).json({ error: "PR record not found" });
-      }
-      res.json({ message: "PR record deleted successfully" });
+      await PRService.deletePR(id);
+      res.json({ success: true, message: "PR record deleted successfully" });
     } catch (error) {
-      res.status(500).json({ error: error.message });
+      handleError(error, res);
     }
   }
 
   static async getNextNo(req, res) {
     try {
       const { year, month } = req.query;
-      if (!year || !month) {
-        return res.status(400).json({ error: "Year and month are required" });
-      }
-      const nextPrNo = await PrModel.getNextNo(year, month);
+      const nextPrNo = await SequenceEngine.getNextPRNo(year, month);
       res.json({ success: true, nextPrNo, year, month });
     } catch (error) {
-      res.status(500).json({ error: error.message });
-    }
-  }
-
-  static async updateUnobligatedAmount(req, res) {
-    try {
-      const { prno } = req.params;
-      const { obligated, unobligated } = req.body;
-      await PrModel.updateUnobligatedAmount(prno, obligated, unobligated);
-      res.json({ message: "Unobligated amount updated successfully", prno, obligated, unobligated });
-    } catch (error) {
-      res.status(500).json({ error: error.message });
+      handleError(error, res);
     }
   }
 
   static async getWithBalance(req, res) {
     try {
-      const data = await PrModel.getWithBalance();
-      res.json({ data });
+      const data = await PRService.getPRWithBalance();
+      res.json({ success: true, data });
     } catch (error) {
-      res.status(500).json({ error: error.message });
+      handleError(error, res);
     }
   }
 
   static async getByRecordsId(req, res) {
     try {
       const { id } = req.params;
-      const data = await PrModel.getByRecordsId(id);
-      res.json({ data });
+      const data = await PRService.getPRById(id);
+      res.json({ success: true, data });
     } catch (error) {
-      res.status(500).json({ error: error.message });
+      handleError(error, res);
+    }
+  }
+
+  static async submit(req, res) {
+    try {
+      const { id } = req.params;
+      const result = await PRService.submitPR(id, req.headers['x-user-id']);
+      res.json(result);
+    } catch (error) {
+      handleError(error, res);
+    }
+  }
+
+  static async approve(req, res) {
+    try {
+      const { id } = req.params;
+      const result = await PRService.approvePR(id, req.headers['x-user-id']);
+      res.json(result);
+    } catch (error) {
+      handleError(error, res);
+    }
+  }
+
+  static async reject(req, res) {
+    try {
+      const { id } = req.params;
+      const { remarks } = req.body;
+      const result = await PRService.rejectPR(id, remarks, req.headers['x-user-id']);
+      res.json(result);
+    } catch (error) {
+      handleError(error, res);
     }
   }
 }

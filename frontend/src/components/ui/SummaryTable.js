@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { activitiesAPI } from "../../utils/api";
+import { mooeAPI } from "../../services/api";
 import { getKeyFromLabel } from "../../utils/helper";
 
 const SummaryTable = ({
@@ -14,13 +14,13 @@ const SummaryTable = ({
   useEffect(() => {
     const fetchRecords = async () => {
       try {
-        const res = await activitiesAPI.getAll();
-        const activities = res.data.data || [];
+        const res = await mooeAPI.getAll();
+        const mooeRecords = res.data.data || [];
 
         // --- Filter only if filter value exists
-        const filtered = activities.filter((a) => {
+        const filtered = mooeRecords.filter((a) => {
           const matchOffice =
-            !office || a.division?.toLowerCase() === office.toLowerCase();
+            !office || a.office?.toLowerCase() === office.toLowerCase();
           const matchPapType =
             !papType || a.pap_type?.toLowerCase() === papType.toLowerCase();
           const matchPapDes =

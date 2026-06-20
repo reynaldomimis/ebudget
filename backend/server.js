@@ -3,10 +3,18 @@ const cors = require("cors");
 require("dotenv").config();
 
 const { testConnection } = require("./config/database");
+const { handleError } = require("./utils/errorHandler");
 
-const activityRoutes = require("./routes/activityRoutes");
+// Route Imports
+const mooeRoutes = require("./routes/mooeRoutes");
+const psRoutes = require("./routes/psRoutes");
 const prRoutes = require("./routes/prRoutes");
 const obligationRoutes = require("./routes/obligationRoutes");
+const financialRoutes = require("./routes/financialRoutes");
+const monitoringRoutes = require("./routes/monitoringRoutes");
+const reportRoutes = require("./routes/reportRoutes");
+const aiRoutes = require("./routes/aiRoutes");
+const dashboardRoutes = require("./routes/dashboardRoutes");
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -17,17 +25,28 @@ app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
 testConnection();
 
-app.use("/api/activities", activityRoutes);
-app.use("/api/pr", prRoutes);
-app.use("/api/obligation", obligationRoutes);
+// Versioned API Routes
+const apiV1 = express.Router();
 
+apiV1.use("/mooe", mooeRoutes);
+apiV1.use("/ps", psRoutes);
+apiV1.use("/pr", prRoutes);
+apiV1.use("/obligation", obligationRoutes);
+apiV1.use("/financial", financialRoutes);
+apiV1.use("/monitoring", monitoringRoutes);
+apiV1.use("/reports", reportRoutes);
+apiV1.use("/ai", aiRoutes);
+apiV1.use("/dashboard", dashboardRoutes);
+app.use("/api/v1", apiV1);
+
+// Health Check
 app.get("/api/health", (req, res) => {
-  res.json({ status: "OK", message: "WFP System API is running" });
+  res.json({ success: true, status: "OK", message: "WFP System API v1 is running" });
 });
 
+// Global Error Handler
 app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({ error: "Something went wrong!" });
+  handleError(err, res);
 });
 
 app.listen(PORT, () => {

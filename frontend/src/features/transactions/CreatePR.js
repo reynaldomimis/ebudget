@@ -1,16 +1,58 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { ShoppingCart, Calendar, Info, FileText, Plus, Trash2, Save, Send, AlertCircle } from 'lucide-react';
+import { formatPHP } from '../../utils/formatters';
+import { prAPI } from '../../services/api';
+import ToastService from '../../services/ToastService';
 import PageHeader from '../../components/common/PageHeader';
 import Button from '../../components/common/Button';
+import TransactionFilterEngine from '../../services/TransactionFilterEngine';
+import { FormField, Input, Textarea } from '../../components/common/FormControls';
+import BudgetFilters from '../../components/common/BudgetFilters';
 
 const CreatePR = ({ onCancel }) => {
+  const [prNo, setPrNo] = useState('Loading...');
   const [prDate, setPrDate] = useState(new Date().toISOString().split('T')[0]);
   const [purpose, setPurpose] = useState('');
-  const [fundCluster, setFundCluster] = useState('01 - Regular Agency Fund');
-  const [mooeItem, setMooeItem] = useState('Office Supplies - General');
+
+  const [selection, setSelection] = useState({});
+  const [availableAllocation, setAvailableAllocation] = useState(0);
+
   const [items, setItems] = useState([
     { id: 1, description: '', quantity: 1, unit: 'pcs', unitCost: 0, total: 0 }
   ]);
+
+  // Fetch Next PR Number
+  useEffect(() => {
+    const fetchPrNo = async () => {
+      try {
+        const date = new Date();
+        const year = date.getFullYear().toString().slice(-2);
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const res = await prAPI.getNextNo(year, month);
+        if (res.success) setPrNo(res.nextPrNo);
+      } catch (err) {
+        console.error("Failed to fetch PR No:", err);
+        setPrNo("PR-ERROR");
+      }
+    };
+    fetchPrNo();
+  }, []);
+
+  const handleSelectionChange = useCallback((newSelection) => {
+    setSelection(newSelection);
+  }, []);
+
+  // Load Allocation
+  useEffect(() => {
+    if (selection.isComplete && selection.mooeId) {
+      TransactionFilterEngine.getAvailableAllocation({
+        allotmentClass: 'MOOE',
+        ...selection
+      }).then(setAvailableAllocation);
+    } else {
+      setAvailableAllocation(null);
+    }
+  }, [selection]);
 
   const addItem = () => {
     setItems([...items, { id: Date.now(), description: '', quantity: 1, unit: 'pcs', unitCost: 0, total: 0 }]);
@@ -40,13 +82,48 @@ const CreatePR = ({ onCancel }) => {
   const isFormValid =
     prDate !== '' &&
     purpose.trim() !== '' &&
+    selection.isComplete &&
     items.every(item => item.description.trim() !== '' && item.unitCost > 0) &&
-    grandTotal > 0;
+    grandTotal > 0 &&
+    availableAllocation !== null &&
+    grandTotal <= availableAllocation;
+
+  const handleSubmit = async () => {
+    const prData = {
+      prno: prNo,
+      transaction_date: prDate,
+      purpose: purpose,
+      mooe_id: selection.mooeId,
+      expense_item: selection.expenseItem,
+      expense_sub_item: selection.expenseSubItem,
+      amount: grandTotal, // FIXED: Changed from total_amount to amount
+      items: items.map(item => ({
+        description: item.description,
+        quantity: item.quantity,
+        unit: item.unit,
+        unit_cost: item.unitCost,
+        total: item.total
+      }))
+    };
+
+    console.log("DEBUG: Final Frontend Payload:", JSON.stringify(prData, null, 2));
+
+    try {
+      const response = await prAPI.create(prData);
+      if (response.success) {
+        ToastService.toastSuccess("Purchase Request Submitted Successfully!");
+        onCancel();
+      }
+    } catch (error) {
+      console.error("Submission failed:", error);
+      ToastService.toastError("Failed to submit PR: " + (error.message || "Unknown error"));
+    }
+  };
 
   return (
     <div className="w-full space-y-4 animate-in fade-in duration-500">
       <PageHeader
-        title="Create Procurement Request"
+        title="Create Purchase Request"
         subtitle="Fill out the details for your new PR"
         actions={
           <div className="flex gap-2">
@@ -57,6 +134,7 @@ const CreatePR = ({ onCancel }) => {
               icon={Send}
               size="sm"
               disabled={!isFormValid}
+              onClick={handleSubmit}
             >
               Submit for Review
             </Button>
@@ -65,9 +143,7 @@ const CreatePR = ({ onCancel }) => {
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
-        {/* Main Form Area */}
         <div className="lg:col-span-3 space-y-4">
-          {/* General Information */}
           <div className="bg-white rounded-xl border border-neutral-200 shadow-sm overflow-hidden">
             <div className="p-4 border-b border-neutral-100 bg-neutral-50/50 flex items-center gap-2">
               <div className="p-1.5 bg-primary-50 text-primary-600 rounded-lg">
@@ -76,37 +152,32 @@ const CreatePR = ({ onCancel }) => {
               <h3 className="font-bold text-neutral-900 text-sm uppercase tracking-wider">General Information</h3>
             </div>
             <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-1.5">
-                <label className="block text-[10px] font-black text-neutral-400 uppercase tracking-widest ml-1">PR Number</label>
-                <input
+              <FormField label="PR Number">
+                <Input
                   type="text"
-                  value="PR-2024-0012"
+                  value={prNo}
                   readOnly
-                  className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-4 py-2.5 text-sm font-mono font-bold text-neutral-500 cursor-not-allowed"
+                  className="bg-neutral-50 font-mono text-neutral-500 cursor-not-allowed"
                 />
-              </div>
-              <div className="space-y-1.5">
-                <label className="block text-[10px] font-black text-neutral-400 uppercase tracking-widest ml-1">Date</label>
+              </FormField>
+              <FormField label="Date">
                 <div className="relative">
-                  <Calendar size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-400" />
-                  <input
+                  <Calendar size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-400 z-10" />
+                  <Input
                     type="date"
-                    className="w-full pl-11 pr-4 py-2.5 bg-white border border-neutral-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary-100 focus:border-primary-500 transition-all"
+                    className="pl-11"
                     value={prDate}
                     onChange={(e) => setPrDate(e.target.value)}
                   />
                 </div>
-              </div>
-              <div className="space-y-1.5 md:col-span-2">
-                <label className="block text-[10px] font-black text-neutral-400 uppercase tracking-widest ml-1">Purpose / Project Description</label>
-                <textarea
-                  rows="3"
-                  placeholder="Describe the purpose of this procurement..."
-                  className="w-full px-4 py-3 bg-white border border-neutral-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary-100 focus:border-primary-500 transition-all resize-none"
+              </FormField>
+              <FormField label="Purpose / Project Description" className="md:col-span-2">
+                <Textarea
+                  placeholder="Describe the purpose of this purchase request..."
                   value={purpose}
                   onChange={(e) => setPurpose(e.target.value)}
-                ></textarea>
-              </div>
+                />
+              </FormField>
             </div>
           </div>
 
@@ -119,10 +190,7 @@ const CreatePR = ({ onCancel }) => {
                 </div>
                 <h3 className="font-bold text-neutral-900 text-sm uppercase tracking-wider">Requested Items</h3>
               </div>
-              <button
-                onClick={addItem}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 text-white rounded-lg text-xs font-bold hover:bg-slate-800 transition-colors shadow-lg"
-              >
+              <button onClick={addItem} className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 text-white rounded-lg text-xs font-bold hover:bg-slate-800 transition-colors shadow-lg">
                 <Plus size={14} /> Add Entry
               </button>
             </div>
@@ -144,51 +212,47 @@ const CreatePR = ({ onCancel }) => {
                     <tr key={item.id} className="group hover:bg-neutral-50/50 transition-colors">
                       <td className="px-6 py-4 text-center text-xs font-bold text-neutral-300">{index + 1}</td>
                       <td className="px-6 py-4">
-                        <input
+                        <Input
                           type="text"
                           placeholder="Item name/specifications"
-                          className="w-full bg-transparent border-none focus:ring-0 p-0 text-sm font-bold text-neutral-700 placeholder:text-neutral-200"
+                          className="!min-h-[38px] !rounded-lg border-transparent hover:border-neutral-200 bg-transparent focus:bg-white"
                           value={item.description}
                           onChange={(e) => updateItem(item.id, 'description', e.target.value)}
                         />
                       </td>
                       <td className="px-6 py-4">
-                        <input
+                        <Input
                           type="number"
-                          className="w-full bg-neutral-50 border border-transparent hover:border-neutral-200 focus:bg-white focus:border-primary-500 rounded-lg px-2 py-1.5 text-sm text-center font-bold focus:ring-0 transition-all"
+                          className="!min-h-[38px] !rounded-lg border-transparent hover:border-neutral-200 bg-transparent focus:bg-white text-center"
                           value={item.quantity}
                           onChange={(e) => updateItem(item.id, 'quantity', e.target.value)}
                         />
                       </td>
                       <td className="px-6 py-4">
-                        <input
+                        <Input
                           type="text"
                           placeholder="pcs"
-                          className="w-full bg-neutral-50 border border-transparent hover:border-neutral-200 focus:bg-white focus:border-primary-500 rounded-lg px-2 py-1.5 text-sm text-center font-bold focus:ring-0 transition-all"
+                          className="!min-h-[38px] !rounded-lg border-transparent hover:border-neutral-200 bg-transparent focus:bg-white text-center"
                           value={item.unit}
                           onChange={(e) => updateItem(item.id, 'unit', e.target.value)}
                         />
                       </td>
                       <td className="px-6 py-4">
                         <div className="relative">
-                           <span className="absolute left-1 top-1/2 -translate-y-1/2 text-neutral-300 font-bold text-xs">₱</span>
-                            <input
+                          <span className="absolute left-1 top-1/2 -translate-y-1/2 text-neutral-300 font-bold text-xs z-10">₱</span>
+                          <Input
                             type="number"
-                            className="w-full pl-4 bg-neutral-50 border border-transparent hover:border-neutral-200 focus:bg-white focus:border-primary-500 rounded-lg px-2 py-1.5 text-sm text-right font-mono font-bold focus:ring-0 transition-all"
+                            className="!min-h-[38px] !rounded-lg border-transparent hover:border-neutral-200 bg-transparent focus:bg-white text-right pl-4 font-mono"
                             value={item.unitCost}
                             onChange={(e) => updateItem(item.id, 'unitCost', e.target.value)}
-                            />
+                          />
                         </div>
                       </td>
                       <td className="px-6 py-4 text-right text-sm font-black font-mono text-neutral-900 whitespace-nowrap">
-                        ₱{item.total.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                        ₱{formatPHP(item.total)}
                       </td>
                       <td className="px-6 py-4 text-center">
-                        <button
-                          onClick={() => removeItem(item.id)}
-                          className="text-neutral-200 hover:text-rose-500 transition-colors p-1"
-                          disabled={items.length === 1}
-                        >
+                        <button onClick={() => removeItem(item.id)} className="text-neutral-200 hover:text-rose-500 transition-colors p-1" disabled={items.length === 1}>
                           <Trash2 size={14} />
                         </button>
                       </td>
@@ -201,7 +265,7 @@ const CreatePR = ({ onCancel }) => {
               <div className="text-right space-y-1">
                 <p className="text-[10px] font-black text-neutral-400 uppercase tracking-widest">Grand Total Amount</p>
                 <h2 className="text-3xl font-black font-mono text-emerald-600 tracking-tighter">
-                  ₱{grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                  ₱{formatPHP(grandTotal)}
                 </h2>
               </div>
             </div>
@@ -210,54 +274,37 @@ const CreatePR = ({ onCancel }) => {
 
         {/* Sidebar */}
         <div className="lg:col-span-1 space-y-4">
-          {/* Budget Source */}
           <div className="bg-white rounded-xl border border-neutral-200 shadow-sm p-5 space-y-5">
             <div className="flex items-center gap-2">
-               <div className="p-1.5 bg-emerald-50 text-emerald-600 rounded-lg">
+              <div className="p-1.5 bg-emerald-50 text-emerald-600 rounded-lg">
                 <FileText size={18} />
-               </div>
+              </div>
               <h3 className="font-bold text-neutral-900 text-sm uppercase tracking-wider">Budget Source</h3>
             </div>
-            <div className="space-y-4">
-              <div className="space-y-1.5">
-                <label className="block text-[10px] font-black text-neutral-500 uppercase tracking-widest ml-1">Fund Cluster</label>
-                <select
-                    className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-4 py-2.5 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-primary-100 focus:border-primary-500 transition-all"
-                    value={fundCluster}
-                    onChange={(e) => setFundCluster(e.target.value)}
-                >
-                  <option>01 - Regular Agency Fund</option>
-                  <option>07 - Trust Receipts</option>
-                </select>
-              </div>
-              <div className="space-y-1.5">
-                <label className="block text-[10px] font-black text-neutral-500 uppercase tracking-widest ml-1">MOOE Item</label>
-                <select
-                    className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-4 py-2.5 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-primary-100 focus:border-primary-500 transition-all"
-                    value={mooeItem}
-                    onChange={(e) => setMooeItem(e.target.value)}
-                >
-                  <option>Office Supplies - General</option>
-                  <option>Information Technology Supplies</option>
-                  <option>Training & Seminars</option>
-                  <option>Other Supplies & Materials</option>
-                </select>
-              </div>
 
-              <div className="p-4 bg-emerald-50 rounded-xl border border-emerald-100">
+            <div className="space-y-4">
+              <BudgetFilters
+                allotmentClass="MOOE"
+                onSelectionChange={handleSelectionChange}
+              />
+
+              <div className={`p-4 rounded-xl border ${availableAllocation === null ? 'bg-neutral-50 border-neutral-100' : 'bg-emerald-50 border-emerald-100'}`}>
                 <div className="flex justify-between items-center mb-2">
-                  <span className="text-[10px] font-black text-emerald-700 uppercase tracking-widest">Available Balance</span>
-                  <span className="text-sm font-black text-emerald-900 font-mono">₱125,000.00</span>
+                  <span className={`text-[10px] font-black uppercase tracking-widest ${availableAllocation === null ? 'text-neutral-400' : 'text-emerald-700'}`}>
+                    Available Allocation
+                  </span>
+                  <span className={`text-sm font-black font-mono ${availableAllocation === null ? 'text-neutral-400' : 'text-emerald-900'}`}>
+                    ₱{formatPHP(availableAllocation || 0)}
+                  </span>
                 </div>
-                <div className="w-full h-2 bg-emerald-200 rounded-full overflow-hidden">
-                  <div
-                    className={`h-full transition-all duration-700 ${grandTotal > 125000 ? 'bg-rose-500' : 'bg-emerald-500'}`}
-                    style={{ width: `${Math.min((grandTotal / 125000) * 100, 100)}%` }}
+                <div className="w-full h-2 bg-neutral-200 rounded-full overflow-hidden">
+                  <div className={`h-full transition-all duration-700 ${availableAllocation !== null && grandTotal > availableAllocation ? 'bg-rose-500' : 'bg-emerald-500'}`}
+                    style={{ width: `${availableAllocation && availableAllocation > 0 ? Math.min((grandTotal / availableAllocation) * 100, 100) : 0}%` }}
                   ></div>
                 </div>
-                {grandTotal > 125000 && (
+                {availableAllocation !== null && grandTotal > availableAllocation && availableAllocation > 0 && (
                   <p className="text-[10px] text-rose-600 font-black mt-2 flex items-center gap-1 uppercase tracking-widest">
-                    <AlertCircle size={12} /> Amount exceeds budget
+                    <AlertCircle size={12} /> Amount exceeds allocation
                   </p>
                 )}
               </div>

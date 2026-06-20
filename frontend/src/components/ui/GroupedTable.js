@@ -21,7 +21,7 @@ const GroupedTable = ({
     if (level1 === "Program" && mainProgram)
       tempData = tempData.filter((row) => row.pap_type === mainProgram);
     if (level1 === "Office" && mainProgram)
-      tempData = tempData.filter((row) => row.division === mainProgram);
+      tempData = tempData.filter((row) => row.office === mainProgram);
     if (subProgram)
       tempData = tempData.filter((row) => row.pap_des === subProgram);
     if (!searchTerm) return tempData;

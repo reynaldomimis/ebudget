@@ -1,18 +1,16 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useBudget } from '../../context/BudgetContext';
 import PageHeader from '../../components/common/PageHeader';
+import { formatPHP } from '../../utils/formatters';
 import {
   FileText,
   Download,
   Printer,
   ChevronRight,
-  Library,
   Table as TableIcon,
   PieChart,
   ClipboardList,
-  Search,
-  Filter
+  Search
 } from 'lucide-react';
 
 const ReportLibraryCard = ({ title, description, icon: Icon, onClick }) => (
@@ -34,35 +32,17 @@ const ReportLibraryCard = ({ title, description, icon: Icon, onClick }) => (
 );
 
 const FiscalYearSummary = ({ onBack }) => {
-  const { budgetData } = useBudget();
+  const { executiveSummary } = useBudget();
 
-  const categories = [
-    { id: 'GAS', label: 'GAS' },
-    { id: 'Policy', label: 'Policy' },
-    { id: 'PFNSS', label: 'PFNSS' },
-    { id: 'PGN', label: 'PGN' },
-    { id: 'Assistance', label: 'Assistance' },
-  ];
+  if (!executiveSummary) return <div className="p-20 text-center font-black text-slate-400 text-xs uppercase">Generating Summary...</div>;
 
-  const calculateCategory = (catId) => {
-    let ps = 0, mooe = 0;
-    budgetData.paps.filter(p => p.type === catId).forEach(p => {
-      ps += p.ps.operations;
-      mooe += p.mooe.allocation;
-    });
-    return { ps, mooe, total: ps + mooe };
-  };
-
-  const results = categories.map(cat => ({
-    ...cat,
-    ...calculateCategory(cat.id)
+  const results = Object.entries(executiveSummary.typeSummary).map(([label, data]) => ({
+      label,
+      ...data
   }));
 
-  const totalPS = results.reduce((s, r) => s + r.ps, 0);
-  const totalMOOE = results.reduce((s, r) => s + r.mooe, 0);
-  const totalMain = totalPS + totalMOOE;
-
-  const rlipTotal = budgetData.paps.reduce((s, p) => s + p.ps.rlip, 0);
+  const totalMainPS = results.reduce((s, r) => s + r.ps, 0);
+  const totalMainMOOE = results.reduce((s, r) => s + r.mooe, 0);
 
   return (
     <div className="animate-in fade-in slide-in-from-right-8 duration-500">
@@ -72,7 +52,7 @@ const FiscalYearSummary = ({ onBack }) => {
 
       <PageHeader
         title="Fiscal Year Summary"
-        subtitle="Official GFWP Summary - Financial Work Plan (FY 2024)"
+        subtitle="Official GFWP Summary - Financial Work Plan"
         actions={
             <div className="flex gap-3">
                 <button className="flex items-center gap-2 px-6 py-3 bg-white border border-slate-100 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:shadow-lg transition-all">
@@ -99,31 +79,31 @@ const FiscalYearSummary = ({ onBack }) => {
             {results.map((row, idx) => (
               <tr key={idx} className="hover:bg-slate-50 transition-colors">
                 <td className="px-10 py-5 font-black text-slate-900 uppercase tracking-widest border-r border-slate-50">{row.label}</td>
-                <td className="px-10 py-5 text-right font-mono text-sm font-bold text-slate-600 border-r border-slate-50">₱{row.ps.toLocaleString()}</td>
-                <td className="px-10 py-5 text-right font-mono text-sm font-bold text-slate-600 border-r border-slate-50">₱{row.mooe.toLocaleString()}</td>
-                <td className="px-10 py-5 text-right font-mono text-sm font-black text-slate-900">₱{row.total.toLocaleString()}</td>
+                <td className="px-10 py-5 text-right font-mono text-sm font-bold text-slate-600 border-r border-slate-50">₱{formatPHP(row.ps)}</td>
+                <td className="px-10 py-5 text-right font-mono text-sm font-bold text-slate-600 border-r border-slate-50">₱{formatPHP(row.mooe)}</td>
+                <td className="px-10 py-5 text-right font-mono text-sm font-black text-slate-900">₱{formatPHP(row.total)}</td>
               </tr>
             ))}
 
             <tr className="bg-slate-50/80">
               <td className="px-10 py-6 font-black text-slate-900 uppercase tracking-[0.2em] border-r border-slate-100">TOTAL</td>
-              <td className="px-10 py-6 text-right font-mono text-base font-black text-slate-900 border-r border-slate-100">₱{totalPS.toLocaleString()}</td>
-              <td className="px-10 py-6 text-right font-mono text-base font-black text-slate-900 border-r border-slate-100">₱{totalMOOE.toLocaleString()}</td>
-              <td className="px-10 py-6 text-right font-mono text-base font-black text-blue-600">₱{totalMain.toLocaleString()}</td>
+              <td className="px-10 py-6 text-right font-mono text-base font-black text-slate-900 border-r border-slate-100">₱{formatPHP(totalMainPS)}</td>
+              <td className="px-10 py-6 text-right font-mono text-base font-black text-slate-900 border-r border-slate-100">₱{formatPHP(totalMainMOOE)}</td>
+              <td className="px-10 py-6 text-right font-mono text-base font-black text-blue-600">₱{formatPHP(totalMainPS + totalMainMOOE)}</td>
             </tr>
 
             <tr>
               <td className="px-10 py-5 font-black text-slate-400 uppercase tracking-widest border-r border-slate-50">RLIP</td>
-              <td className="px-10 py-5 text-right font-mono text-sm font-bold text-slate-400 border-r border-slate-50">₱{rlipTotal.toLocaleString()}</td>
+              <td className="px-10 py-5 text-right font-mono text-sm font-bold text-slate-400 border-r border-slate-50">₱{formatPHP(executiveSummary.rlip)}</td>
               <td className="px-10 py-5 text-right font-mono text-sm font-bold text-slate-400 border-r border-slate-50">₱0</td>
-              <td className="px-10 py-5 text-right font-mono text-sm font-bold text-slate-400">₱{rlipTotal.toLocaleString()}</td>
+              <td className="px-10 py-5 text-right font-mono text-sm font-bold text-slate-400">₱{formatPHP(executiveSummary.rlip)}</td>
             </tr>
 
             <tr className="bg-blue-50/40">
               <td className="px-10 py-8 font-black text-blue-900 uppercase tracking-[0.4em] border-r border-blue-100">GRAND TOTAL</td>
-              <td className="px-10 py-8 text-right font-mono text-lg font-black text-blue-900 border-r border-blue-100">₱{(totalPS + rlipTotal).toLocaleString()}</td>
-              <td className="px-10 py-8 text-right font-mono text-lg font-black text-blue-900 border-r border-blue-100">₱{totalMOOE.toLocaleString()}</td>
-              <td className="px-10 py-8 text-right font-mono text-2xl font-black text-blue-600">₱{(totalMain + rlipTotal).toLocaleString()}</td>
+              <td className="px-10 py-8 text-right font-mono text-lg font-black text-blue-900 border-r border-blue-100">₱{formatPHP(executiveSummary.personnelTotal)}</td>
+              <td className="px-10 py-8 text-right font-mono text-lg font-black text-blue-900 border-r border-blue-100">₱{formatPHP(executiveSummary.mooe + executiveSummary.co)}</td>
+              <td className="px-10 py-8 text-right font-mono text-2xl font-black text-blue-600">₱{formatPHP(executiveSummary.grandTotal)}</td>
             </tr>
           </tbody>
         </table>
@@ -174,7 +154,7 @@ const ReportCenter = () => {
         />
         <ReportLibraryCard
           title="PR Monitoring Report"
-          description="Purchase Request registry for the current fiscal cycle including procurement status."
+          description="Purchase Request registry for the current fiscal cycle including purchase status."
           icon={Search}
           onClick={() => {}}
         />

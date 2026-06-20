@@ -34,7 +34,7 @@ const NAV_ITEMS = [
     icon: ArrowLeftRight,
     section: 'Transactions',
     subItems: [
-      { id: 'create-pr', label: 'Procurement Requests' },
+      { id: 'create-pr', label: 'Purchase Requests' },
       { id: 'create-obligation', label: 'Obligation Register' },
     ],
   },

@@ -2,8 +2,8 @@ import React, { useState, useRef } from "react";
 import { useNavigate } from 'react-router-dom';
 import * as XLSX from "xlsx";
 import { Upload, CheckCircle, AlertCircle, ArrowRight, Wallet, UserCheck, History, RefreshCcw, Send } from "lucide-react";
-import { toast } from "react-toastify";
-import { activitiesAPI } from "../../../services/api";
+import ToastService from "../../../services/ToastService";
+import { mooeAPI, psAPI } from "../../../services/api";
 import PageHeader from "../../../components/common/PageHeader";
 import GroupedTable from "../../../components/ui/GroupedTable";
 import PSTable from "../../../components/ui/PSTable";
@@ -67,16 +67,15 @@ const ImportCenter = () => {
 
         const detectedType = detectImportType(jsonData);
 
-        // Validation: Check if detected file type matches the user's selection
         if (!detectedType) {
-          toast.error("Unrecognized Excel format! Please use the standard template.");
+          ToastService.toastError("Unrecognized Excel format! Please use the standard template.");
           setFile(null);
           setIsProcessing(false);
           return;
         }
 
         if (detectedType !== importType) {
-          toast.error(`Invalid File! You selected ${importType} but the uploaded file appears to be a ${detectedType} workplan.`);
+          ToastService.toastError(`Invalid File! You selected ${importType} but the uploaded file appears to be a ${detectedType} workplan.`);
           setFile(null);
           setIsProcessing(false);
           if (fileInputRef.current) fileInputRef.current.value = "";
@@ -90,7 +89,7 @@ const ImportCenter = () => {
           formattedData = jsonData
             .slice(startRow - 1, Math.min(endRow, jsonData.length))
             .map((row) => ({
-              division: cleanString(row[0]),
+              office: cleanString(row[0]),
               name: [row[1], row[2], row[3], row[4]].map(cleanString).join(" ").trim(),
               performance_indicator: cleanString(row[5]),
               pt1: parseInt(row[6]) || 0,
@@ -118,6 +117,7 @@ const ImportCenter = () => {
           let currentPapType = "";
           let currentPapDes = "";
           let currentPapDesCode = "";
+          let currentCostCategory = "PS";
 
           formattedData = jsonData.slice(startRowIndex).reduce((acc, row) => {
             const rawName = String(row[0] || "").trim();
@@ -126,27 +126,44 @@ const ImportCenter = () => {
             const noisePatterns = [/total/i, /sub-total/i, /grand total/i, /ceiling/i, /difference/i, /^oo:/i, /^operations$/i];
             if (noisePatterns.some(p => p.test(rawName))) return acc;
 
+            // Detect RLIP Section
+            const isRlipHeader = rawName.toUpperCase().includes("RETIREMENT AND LIFE INSURANCE PREMIUMS") || rawName.toUpperCase().includes("(RLIP)");
+            if (isRlipHeader) {
+                currentCostCategory = "RLIP";
+            }
+
             const totalVal = parseFloat(row[1]) || 0;
             const isNumberedAccount = /^\d+\./.test(rawName);
             const cleanName = rawName.replace(/^\d+\.\s*/, "").replace(/^\d{10,}\s*/, "").trim();
 
             if (isNumberedAccount || totalVal > 0) {
+              // Rule: If in RLIP section, the item name IS the actual PAP Description
+              const finalPapDes = currentCostCategory === "RLIP" ? cleanName : currentPapDes;
+
               acc.push({
                 name: cleanName,
-                expense_items: cleanName,
+                expense_items: currentCostCategory === "RLIP" ? "RLIP" : cleanName,
                 total_amount: totalVal,
                 is_ps_expense: true,
                 is_header: false,
                 pap_type: currentPapType,
-                pap_des: currentPapDes,
+                pap_des: finalPapDes,
                 pap_des_code: currentPapDesCode,
+                cost_category: currentCostCategory,
+                aggregation_level: "ITEM"
               });
             } else {
+              if (isRlipHeader) return acc; // Skip storing the header row itself to avoid "fake" PAP descriptions
+
               const upperName = cleanName.toUpperCase();
+              let aggregationLevel = "ITEM";
+
               if (upperName.includes("NATIONAL NUTRITION MANAGEMENT PROGRAM") || upperName.includes("GENERAL ADMINISTRATION AND SUPPORT")) {
                 currentPapType = upperName;
                 currentPapDes = "";
                 currentPapDesCode = "";
+                currentCostCategory = "PS"; // Reset cost category when major type changes
+                aggregationLevel = "PAP_TYPE";
               } else {
                 const codeMatch = rawName.match(/^(\d{10,})\s+(.*)$/);
                 if (codeMatch) {
@@ -156,6 +173,7 @@ const ImportCenter = () => {
                   currentPapDes = cleanName;
                   currentPapDesCode = "";
                 }
+                aggregationLevel = "PAP_DESCRIPTION";
               }
               const isMajor = upperName.includes("NATIONAL NUTRITION MANAGEMENT PROGRAM") || upperName.includes("GENERAL ADMINISTRATION AND SUPPORT");
               acc.push({
@@ -165,6 +183,8 @@ const ImportCenter = () => {
                 pap_type: currentPapType,
                 pap_des: currentPapDes,
                 pap_des_code: currentPapDesCode,
+                cost_category: currentCostCategory,
+                aggregation_level: aggregationLevel,
                 is_header: true,
                 isHeader: isMajor,
                 isSubHeader: !isMajor,
@@ -175,9 +195,9 @@ const ImportCenter = () => {
         }
 
         setTableData(formattedData);
-        toast.success(`Validated ${importType} file. ${formattedData.length} records ready.`);
+        ToastService.toastSuccess(`Validated ${importType} file. ${formattedData.length} records ready.`);
       } catch (err) {
-        toast.error("Error processing file: " + err.message);
+        ToastService.toastError("Error processing file: " + err.message);
       } finally {
         setIsProcessing(false);
       }
@@ -192,7 +212,7 @@ const ImportCenter = () => {
     }
 
     let refMain = "", refMiddle = "", refCenter = "", refLast = "";
-    let lastPapType = "", lastPapDes = "", lastDivision = "", lastName = "";
+    let lastPapType = "", lastPapDes = "", lastOffice = "", lastName = "", lastExpenseItem = "";
 
     const rebuiltData = tableData.reduce((acc, row) => {
       const rawName = row.name || "";
@@ -204,32 +224,44 @@ const ImportCenter = () => {
 
       if (papTypeMatch || lastPapType === "") {
         if (papTypeMatch && papTypeMatch !== lastPapType) {
-          refMain = ""; refMiddle = ""; refCenter = ""; refLast = ""; lastName = "";
+          refMain = ""; refMiddle = ""; refCenter = ""; refLast = ""; lastName = ""; lastExpenseItem = "";
         }
         lastPapType = papTypeMatch || lastPapType;
       }
-      if (papDesMatch) lastPapDes = papDesMatch;
+      if (papDesMatch) {
+        lastPapDes = papDesMatch;
+        lastExpenseItem = "";
+      }
 
       if (safeString(cleanedName) === safeString(lastPapType) || safeString(cleanedName) === safeString(lastPapDes)) return acc;
 
-      const division = row.division || lastDivision;
-      if (row.division) lastDivision = row.division;
-
-      if (hierarchyLevel === 1) { refMain = cleanedName; refMiddle = ""; refCenter = ""; refLast = ""; }
-      else if (hierarchyLevel === 2) { refMiddle = cleanedName; refCenter = ""; refLast = ""; }
-      else if (hierarchyLevel === 3) { refCenter = cleanedName; refLast = ""; }
-      else if (hierarchyLevel >= 4) { refLast = cleanedName; }
+      const office = row.office || lastOffice;
+      if (row.office) lastOffice = row.office;
 
       const finalName = cleanedName || lastName;
-      if (safeString(cleanedName)) lastName = cleanedName;
+      if (safeString(cleanedName)) {
+        if (hierarchyLevel === 1) { refMain = cleanedName; refMiddle = ""; refCenter = ""; refLast = ""; lastExpenseItem = ""; }
+        else if (hierarchyLevel === 2) { refMiddle = cleanedName; refCenter = ""; refLast = ""; lastExpenseItem = ""; }
+        else if (hierarchyLevel === 3) { refCenter = cleanedName; refLast = ""; lastExpenseItem = ""; }
+        else if (hierarchyLevel >= 4) { refLast = cleanedName; lastExpenseItem = ""; }
+
+        if (cleanedName !== lastName) {
+            lastExpenseItem = "";
+        }
+        lastName = cleanedName;
+      }
+
+      const expense_items = row.expense_items || lastExpenseItem;
+      if (row.expense_items) lastExpenseItem = row.expense_items;
 
       acc.push({
         ...row,
         count_type: hierarchyLevel,
-        division,
+        office,
         pap_type: lastPapType,
         pap_des: lastPapDes,
         name: finalName,
+        expense_items,
         ref_main_name: refMain,
         ref_middle_name: refMiddle,
         ref_center_name: refCenter,
@@ -247,7 +279,7 @@ const ImportCenter = () => {
     setIsUploading(true);
     try {
       const isPS = planData.allotmentType === "PS";
-      const activities = tableData
+      const records = tableData
         .filter((row) => !row.is_header)
         .map((row, index) => {
           const rawValue = (val) => Number(String(val || 0).replace(/,/g, "")) || 0;
@@ -260,25 +292,36 @@ const ImportCenter = () => {
             totalFq: isPS ? rawValue(row.totalFq) : convertToThousandsNumber(row.totalFq),
             total_amount: isPS ? rawValue(row.total_amount) : convertToThousandsNumber(row.total_amount),
             amount: isPS ? rawValue(row.total_amount) : 0,
+            total: isPS ? rawValue(row.total_amount) : 0,
             sort_order: index,
             plan_year: new Date(planData.planDate).getFullYear(),
             allotment_class: planData.allotmentType,
           };
         });
 
-      await activitiesAPI.createPlanWithActivities({
-        title: planData.planName,
-        planDate: planData.planDate,
-        range_label: "Annual",
-        allotment_class: planData.allotmentType,
-        activities,
-      });
+      if (isPS) {
+        await psAPI.createPlanWithPS({
+          title: planData.planName,
+          planDate: planData.planDate,
+          range_label: "Annual",
+          psItems: records,
+        });
+      } else {
+        await mooeAPI.createPlanWithMOOE({
+          title: planData.planName,
+          planDate: planData.planDate,
+          range_label: "Annual",
+          allotment_class: planData.allotmentType,
+          mooeItems: records,
+        });
+      }
 
-      setImportSummary({ count: activities.length, type: planData.allotmentType, date: new Date().toLocaleString() });
+      setImportSummary({ count: records.length, type: planData.allotmentType, date: new Date().toLocaleString() });
       setStep(4);
-      toast.success("Import successful!");
+      ToastService.toastSuccess("Import successful!");
     } catch (err) {
-      toast.error("Upload failed!");
+      console.error("IMPORT ERROR:", err);
+      ToastService.toastError("Upload failed!");
     } finally {
       setIsUploading(false);
       setIsModalOpen(false);

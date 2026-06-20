@@ -5,11 +5,11 @@ const UserList = () => {
   const [searchTerm, setSearchTerm] = useState('');
 
   const mockData = [
-    { id: 1, name: 'Reynaldo Mimis', position: 'Chief Budget Officer', role: 'Administrator', division: 'Finance Division', status: 'Active', lastLogin: '2m ago' },
-    { id: 2, name: 'Juan Dela Cruz', position: 'Administrative Assistant', role: 'Encoder', division: 'Operations Division', status: 'Active', lastLogin: '1h ago' },
-    { id: 3, name: 'Maria Clara', position: 'Division Chief', role: 'Reviewer', division: 'Office of the Director', status: 'Active', lastLogin: '1d ago' },
-    { id: 4, name: 'Pedro Penduko', position: 'Assistant Secretary', role: 'Approver', division: 'Finance Division', status: 'Active', lastLogin: '3h ago' },
-    { id: 5, name: 'Elena Guerrero', position: 'Budget Specialist', role: 'Budget Officer', division: 'Technical Services', status: 'Inactive', lastLogin: '5d ago' },
+    { id: 1, name: 'Reynaldo Mimis', position: 'Chief Budget Officer', role: 'Administrator', office: 'Finance Office', status: 'Active', lastLogin: '2m ago' },
+    { id: 2, name: 'Juan Dela Cruz', position: 'Administrative Assistant', role: 'Encoder', office: 'Operations Office', status: 'Active', lastLogin: '1h ago' },
+    { id: 3, name: 'Maria Clara', position: 'Office Chief', role: 'Reviewer', office: 'Office of the Director', status: 'Active', lastLogin: '1d ago' },
+    { id: 4, name: 'Pedro Penduko', position: 'Assistant Secretary', role: 'Approver', office: 'Finance Office', status: 'Active', lastLogin: '3h ago' },
+    { id: 5, name: 'Elena Guerrero', position: 'Budget Specialist', role: 'Budget Officer', office: 'Technical Services', status: 'Inactive', lastLogin: '5d ago' },
   ];
 
   return (
@@ -37,7 +37,7 @@ const UserList = () => {
               <th className="px-10 py-6">User</th>
               <th className="px-10 py-6">Position</th>
               <th className="px-10 py-6">Role</th>
-              <th className="px-10 py-6">Division</th>
+              <th className="px-10 py-6">Office</th>
               <th className="px-10 py-6">Status</th>
               <th className="px-10 py-6">Last Login</th>
               <th className="px-10 py-6 text-right">Actions</th>
@@ -62,7 +62,7 @@ const UserList = () => {
                     {user.role}
                   </span>
                 </td>
-                <td className="px-10 py-5 text-xs font-bold text-slate-500 uppercase">{user.division}</td>
+                <td className="px-10 py-5 text-xs font-bold text-slate-500 uppercase">{user.office}</td>
                 <td className="px-10 py-5">
                   <div className="flex items-center gap-2">
                     <div className={`w-2 h-2 rounded-full ${user.status === 'Active' ? 'bg-emerald-500' : 'bg-slate-300'}`}></div>

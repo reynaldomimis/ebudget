@@ -7,7 +7,7 @@ const AuditTrail = () => {
   const mockData = [
     { id: 1, timestamp: '2024-10-24 10:45:22', user: 'reynaldo.mimis', action: 'Imported PS Budget', module: 'IMPORT', reference: 'PS_FY2024_Q4', ip: '192.168.1.15' },
     { id: 2, timestamp: '2024-10-24 09:12:05', user: 'admin.approver', action: 'Approved Obligation', module: 'OBLIGATIONS', reference: 'OB-2024-1054', ip: '192.168.1.10' },
-    { id: 3, timestamp: '2024-10-23 16:30:12', user: 'juan.delacruz', action: 'Created Purchase Request', module: 'PROCUREMENT', reference: 'PR-2024-0012', ip: '10.0.5.22' },
+    { id: 3, timestamp: '2024-10-23 16:30:12', user: 'juan.delacruz', action: 'Created Purchase Request', module: 'PURCHASE', reference: 'PR-2024-0012', ip: '10.0.5.22' },
     { id: 4, timestamp: '2024-10-23 14:20:45', user: 'sys_admin', action: 'Archived Fiscal Year', module: 'SYSTEM', reference: 'FY2023_ARCHIVE', ip: '172.16.0.45' },
     { id: 5, timestamp: '2024-10-22 11:05:33', user: 'reynaldo.mimis', action: 'Modified Role: Encoder', module: 'SECURITY', reference: 'ROLE_MOD_01', ip: '127.0.0.1' },
   ];

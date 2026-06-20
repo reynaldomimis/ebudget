@@ -63,7 +63,7 @@ export const getKeyFromLabel = (label) => {
 //Helper object column in table
 export const columnConfig = [
   {
-    key: "division",
+    key: "office",
     label: "OFFICE",
     width: "65px",
     align: "center",

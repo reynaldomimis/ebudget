@@ -4,8 +4,8 @@ import {
   formatPHP,
   parsePHP,
 } from "../../utils/formatters";
-import { toast } from "react-toastify";
-import { activitiesAPI } from "../../utils/api";
+import ToastService from "../../services/ToastService";
+import { mooeAPI } from "../../services/api";
 
 const SubtotalModal = ({ isOpen, onClose, selectedSubtotal, onSubmit }) => {
   const [amount, setAmount] = useState(selectedSubtotal?.totalFq || 0);
@@ -46,12 +46,12 @@ const SubtotalModal = ({ isOpen, onClose, selectedSubtotal, onSubmit }) => {
     const numericAmount = parsePHP(amount);
 
     if (!numericAmount || numericAmount <= 0) {
-      toast.warning("Amount is required and must be greater than zero.");
+      ToastService.toastWarning("Amount is required and must be greater than zero.");
       return;
     }
 
     try {
-      await activitiesAPI.updateTotalFq(selectedSubtotal.id, numericAmount);
+      await mooeAPI.update(selectedSubtotal.id, { totalFq: numericAmount });
 
       //update parent/local state
       if (onSubmit) {
@@ -61,11 +61,11 @@ const SubtotalModal = ({ isOpen, onClose, selectedSubtotal, onSubmit }) => {
         });
       }
 
-      toast.success("Total FQ updated successfully");
+      ToastService.toastSuccess("Total FQ updated successfully");
       onClose();
     } catch (error) {
       console.error(error);
-      toast.error("Failed to update totalFq");
+      ToastService.toastError("Failed to update totalFq");
     }
   };
 

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Search } from "lucide-react";
-import { activitiesAPI } from "../../utils/api";
+import { mooeAPI } from "../../services/api";
 import GroupedTable from "./GroupedTable";
 
 const allotmentOptions = [
@@ -11,7 +11,7 @@ const allotmentOptions = [
 ];
 
 export default function BudgetForm() {
-  const [allActivities, setAllActivities] = useState([]);
+  const [allMOOE, setAllMOOE] = useState([]);
   const [papTypes, setPapTypes] = useState([]);
   const [papOptions, setPapOptions] = useState([]);
 
@@ -28,13 +28,13 @@ export default function BudgetForm() {
     const fetchData = async () => {
       setIsLoading(true);
       try {
-        const response = await activitiesAPI.getAll();
-        const activities = response.data.data;
-        setAllActivities(activities);
+        const response = await mooeAPI.getAll();
+        const mooeData = response.data.data;
+        setAllMOOE(mooeData);
 
         // Extract unique PAP Types
         const uniqueTypes = Array.from(
-          new Set(activities.map((a) => a.pap_type).filter(Boolean))
+          new Set(mooeData.map((a) => a.pap_type).filter(Boolean))
         ).sort();
 
         setPapTypes(uniqueTypes);
@@ -51,8 +51,8 @@ export default function BudgetForm() {
   // Update PAP Description options based on selected PAP Type
   useEffect(() => {
     const filtered = selectedPapType
-      ? allActivities.filter(a => a.pap_type === selectedPapType)
-      : allActivities;
+      ? allMOOE.filter(a => a.pap_type === selectedPapType)
+      : allMOOE;
 
     const uniquePaps = Array.from(
       new Set(filtered.map((a) => a.pap_des).filter(Boolean))
@@ -60,13 +60,13 @@ export default function BudgetForm() {
 
     setPapOptions(uniquePaps);
     setSelectedPapDes("");
-  }, [selectedPapType, allActivities]);
+  }, [selectedPapType, allMOOE]);
 
   const handleRetrieve = () => {
     setIsLoading(true);
 
     // Filtering logic
-    let filtered = allActivities;
+    let filtered = allMOOE;
 
     if (selectedPapType) {
       filtered = filtered.filter(a => a.pap_type === selectedPapType);
@@ -75,9 +75,6 @@ export default function BudgetForm() {
     if (selectedPapDes) {
       filtered = filtered.filter(a => a.pap_des === selectedPapDes);
     }
-
-    // Note: If you have an allotment_class field in your data, filter by it here
-    // For now, we show the records matching PAP Type and Description
 
     setRetrievedData(filtered);
     setHasRetrieved(true);
