@@ -2,6 +2,7 @@ const FinancialEngine = require("../engines/FinancialEngine");
 const MonitoringEngine = require("../engines/MonitoringEngine");
 const CacheEngine = require("../engines/CacheEngine");
 const FiscalYearContext = require("../engines/FiscalYearContext");
+const { pool } = require("../config/database");
 
 class DashboardService {
   static async getExecutiveSummary(planId) {
@@ -14,17 +15,20 @@ class DashboardService {
     const finSummary = await FinancialEngine.getExecutiveSummary(planId);
     const monOverview = await MonitoringEngine.getOverview(planId);
 
+    const mooeTotal = finSummary.mooe || 0;
+    const obligatedTotal = finSummary.obligated.total || 0;
+
     const result = {
       fiscalYear: planId,
-      totalBudget: finSummary.grandTotal,
-      totalObligated: finSummary.obligated.total,
-      remainingBudget: finSummary.balance.total,
-      utilizationRate: finSummary.utilization,
-      // Breakdown for regression fix
+      totalBudget: mooeTotal,
+      totalObligated: obligatedTotal,
+      remainingBudget: mooeTotal - obligatedTotal,
+      utilizationRate: mooeTotal > 0 ? (obligatedTotal / mooeTotal) * 100 : 0,
+
       ps: finSummary.ps,
       rlip: finSummary.rlip,
       personnelTotal: finSummary.personnelTotal,
-      mooe: finSummary.mooe,
+      mooe: mooeTotal,
       co: finSummary.co || 0,
       typeSummary: finSummary.typeSummary,
       papComposition: finSummary.papComposition,
@@ -38,7 +42,7 @@ class DashboardService {
       },
       health: {
         status: monOverview.fiscalYearHealth,
-        score: finSummary.utilization
+        score: mooeTotal > 0 ? (obligatedTotal / mooeTotal) * 100 : 0
       },
       activePRs: monOverview.activePRs,
       activeObligations: monOverview.totalObligations
@@ -46,6 +50,35 @@ class DashboardService {
 
     CacheEngine.set(cacheKey, result);
     return result;
+  }
+
+  static async getRecentTransactions(limit = 10) {
+    const [rows] = await pool.query(`
+      SELECT
+        id,
+        prno as reference,
+        'PR' as type,
+        amount,
+        workflow_status as status,
+        created_at as date,
+        purpose as description
+      FROM pr_so
+      WHERE is_deleted = 0
+      UNION ALL
+      SELECT
+        id,
+        obrno as reference,
+        'OBLIGATION' as type,
+        amount,
+        'Obligated' as status,
+        transaction_date as date,
+        particular as description
+      FROM obligation
+      WHERE is_deleted = 0
+      ORDER BY date DESC
+      LIMIT ?
+    `, [limit]);
+    return rows;
   }
 }
 

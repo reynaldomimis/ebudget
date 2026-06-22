@@ -25,6 +25,15 @@ class DashboardController {
       res.status(500).json({ success: false, error: error.message });
     }
   }
+
+  static async getRecentTransactions(req, res) {
+    try {
+      const data = await DashboardService.getRecentTransactions(15);
+      res.json({ success: true, data });
+    } catch (error) {
+      res.status(500).json({ success: false, error: error.message });
+    }
+  }
 }
 
 module.exports = DashboardController;

@@ -2,11 +2,10 @@ const { pool } = require("../config/database");
 
 class PRRepository {
   static async create(prData, connection = pool) {
-    const query = `INSERT INTO pr_so (mooe_id, prno, transaction_date, amount, purpose) VALUES (?, ?, ?, ?, ?)`;
+    const query = `INSERT INTO pr_so (mooe_id, prno, amount, purpose) VALUES (?, ?, ?, ?)`;
     const [result] = await connection.execute(query, [
       prData.mooe_id,
       prData.prno,
-      prData.transaction_date,
       prData.amount,
       prData.purpose
     ]);
@@ -59,13 +58,12 @@ class PRRepository {
   static async update(id, prData, connection = pool) {
     const query = `
       UPDATE pr_so
-      SET mooe_id = ?, prno = ?, transaction_date = ?, amount = ?, purpose = ?
+      SET mooe_id = ?, prno = ?, amount = ?, purpose = ?
       WHERE id = ?
     `;
     const [result] = await connection.execute(query, [
       prData.mooe_id,
       prData.prno,
-      prData.transaction_date,
       prData.amount || 0,
       prData.purpose,
       id,

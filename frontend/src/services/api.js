@@ -50,6 +50,7 @@ export const financialAPI = {
 export const dashboardAPI = {
   getExecutiveSummary: (planId) => api.get("/dashboard/executive-summary", { params: { plan_id: planId } }),
   getAuditFeed: () => api.get("/dashboard/audit-feed"),
+  getRecentTransactions: () => api.get("/dashboard/recent-transactions"),
 };
 
 export const mooeAPI = {

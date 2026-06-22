@@ -9,6 +9,7 @@ export const BudgetProvider = ({ children }) => {
   const [executiveSummary, setExecutiveSummary] = useState(null);
   const [papSummary, setPapSummary] = useState([]);
   const [auditFeed, setAuditFeed] = useState([]);
+  const [recentTransactions, setRecentTransactions] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -16,18 +17,22 @@ export const BudgetProvider = ({ children }) => {
     setLoading(true);
     setError(null);
     try {
-      const [execResponse, papResponse, auditResponse] = await Promise.all([
+      const [execResponse, papResponse, auditResponse, transResponse] = await Promise.all([
         dashboardAPI.getExecutiveSummary(selectedYear),
         financialAPI.getPapSummary(selectedYear),
-        dashboardAPI.getAuditFeed()
+        dashboardAPI.getAuditFeed(),
+        dashboardAPI.getRecentTransactions()
       ]);
 
       if (execResponse.success) setExecutiveSummary(execResponse.data);
       if (papResponse.success) setPapSummary(papResponse.data);
       if (auditResponse.success) setAuditFeed(auditResponse.data);
+      if (transResponse.success) setRecentTransactions(transResponse.data);
     } catch (err) {
       console.error("Failed to fetch budget data:", err);
-      setError(err.message || "Failed to load budget data");
+      // Extract error message from backend if present
+      const msg = err.error || err.message || "Failed to load budget data";
+      setError(msg);
     } finally {
       setLoading(false);
     }
@@ -41,6 +46,7 @@ export const BudgetProvider = ({ children }) => {
     executiveSummary,
     papSummary,
     auditFeed,
+    recentTransactions,
     loading,
     error,
     refreshBudgetData

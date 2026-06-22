@@ -3,155 +3,117 @@ const PSRepository = require("../repositories/PSRepository");
 const PRRepository = require("../repositories/PRRepository");
 const ObligationRepository = require("../repositories/ObligationRepository");
 const FiscalYearContext = require("./FiscalYearContext");
+const { pool } = require("../config/database");
 
 class FinancialEngine {
-  /**
-   * RULE: CENTRALIZED AGGREGATION BY PAP DESCRIPTION
-   */
   static async getPapDescriptionSummary(plan_id) {
-    if (!plan_id) plan_id = await FiscalYearContext.getActivePlanId();
+    let year;
+    if (plan_id) {
+      const parts = String(plan_id).split('-');
+      const yearPart = parts.find(p => /^20\d{2}$/.test(p));
+      year = yearPart || plan_id;
+    } else {
+      year = await FiscalYearContext.getActiveYear();
+    }
 
-    const mooeItems = (await MOOERepository.getByPlan(plan_id)) || [];
-    const psRecords = (await PSRepository.getAll({ plan_id })) || [];
-    const rlipRecords = (await PSRepository.getRLIPByPlanId(plan_id)) || [];
-    const allObligations = (await ObligationRepository.getAll()) || [];
+    const [rows] = await pool.query(
+      "SELECT * FROM vw_pap_financial_summary WHERE fiscal_year = ? ORDER BY pap_type_code, pap_des_code",
+      [year]
+    );
 
-    const summaryMap = {};
-    const normalize = (s) => (s || "").trim();
-
-    // Collect all valid PAP Descriptions from all allotment classes
-    const allPapDes = [...new Set([
-        ...mooeItems.map(m => normalize(m.pap_des)),
-        ...psRecords.map(p => normalize(p.pap_des)),
-        ...rlipRecords.map(r => normalize(r.pap_des))
-    ])].filter(Boolean);
-
-    allPapDes.forEach(des => {
-        const mooeMatch = mooeItems.find(m => normalize(m.pap_des) === des);
-        const psMatch = psRecords.find(p => normalize(p.pap_des) === des);
-        const rlipMatch = rlipRecords.find(r => normalize(r.pap_des) === des);
-
-        const type = (mooeMatch?.pap_type || psMatch?.pap_type || "Unknown").trim();
-        const code = mooeMatch?.pap_des_code || psMatch?.pap_des_code || rlipMatch?.pap_des_code || "";
-        const sortOrder = mooeMatch?.sort_order ?? 9999;
-
-        // SEPARATION RULE: PS from PS table, RLIP from RLIP table
-        const psBase = psRecords
-            .filter(p => normalize(p.pap_des) === des && p.cost_category === "PS")
-            .reduce((sum, p) => sum + Number(p.amount || 0), 0);
-
-        const rlipAmount = rlipRecords
-            .filter(r => normalize(r.pap_des) === des)
-            .reduce((sum, r) => sum + Number(r.amount || 0), 0);
-
-        const mooeAlloc = mooeItems
-            .filter(m => normalize(m.pap_des) === des && !m.is_subtotal)
-            .reduce((sum, m) => sum + Number(m.totalFq || 0), 0);
-
-        summaryMap[des] = {
-            pap_des: des,
-            type: type,
-            code: code,
-            sortOrder: sortOrder,
-            ps: psBase,
-            rlip: rlipAmount,
-            mooe: mooeAlloc,
-            co: 0,
-            total: psBase + rlipAmount + mooeAlloc,
-            obligated: 0,
-            balance: 0,
-            utilization: 0
-        };
-    });
-
-    return Object.values(summaryMap).sort((a, b) => {
-        if (a.type !== b.type) {
-            const order = { "GENERAL ADMINISTRATION AND SUPPORT": 1, "NATIONAL NUTRITION MANAGEMENT PROGRAM": 2 };
-            return (order[a.type] || 99) - (order[b.type] || 99);
-        }
-        return a.sortOrder - b.sortOrder;
-    });
+    return rows.map(r => ({
+      pap_des: r.pap_description,
+      type: r.pap_type,
+      code: r.pap_des_code,
+      ps: Number(r.ps || 0),
+      rlip: Number(r.rlip || 0),
+      mooe: Number(r.mooe || 0),
+      co: 0,
+      total: Number(r.total_allocation || 0),
+      obligated: Number(r.obligated || 0),
+      balance: Number(r.unobligated || 0),
+      utilization: r.total_allocation > 0 ? (Number(r.obligated || 0) / Number(r.total_allocation)) * 100 : 0
+    }));
   }
 
   static async getExecutiveSummary(plan_id) {
-    if (!plan_id) plan_id = await FiscalYearContext.getActivePlanId();
+    // Resolve fiscal year from plan_id or use current
+    let year;
+    if (plan_id) {
+      const parts = String(plan_id).split('-');
+      // Try to find a part that looks like a year
+      const yearPart = parts.find(p => /^20\d{2}$/.test(p));
+      year = yearPart || plan_id;
+    } else {
+      year = await FiscalYearContext.getActiveYear();
+    }
 
-    const psRecords = (await PSRepository.getAll({ plan_id })) || [];
-    const rlipRecords = (await PSRepository.getRLIPByPlanId(plan_id)) || [];
-    const mooeItems = (await MOOERepository.getByPlan(plan_id)) || [];
-    const allPRs = (await PRRepository.getAll()) || [];
-    const allObligations = (await ObligationRepository.getAll()) || [];
+    // 1. Get Program Level Totals
+    const [programRows] = await pool.query(
+      "SELECT * FROM vw_program_financial_summary WHERE fiscal_year = ?",
+      [year]
+    );
 
-    // Aggregate PS separately
-    const psRowsRaw = psRecords.filter(r => r.cost_category === 'PS');
+    // 2. Get PAP Level Composition
+    const [papRows] = await pool.query(
+      "SELECT * FROM vw_pap_financial_summary WHERE fiscal_year = ? ORDER BY pap_type_code, pap_des_code",
+      [year]
+    );
 
-    const aggregateByDes = (records) => {
-        const map = {};
-        records.forEach(r => {
-            const des = (r.pap_des || "").trim();
-            if (!map[des]) map[des] = { pap_des: des, amount: 0, sort_order: r.sort_order || 999 };
-            map[des].amount += Number(r.amount || 0);
-        });
-        return Object.values(map).sort((a, b) => a.sort_order - b.sort_order);
-    };
+    // 3. Get Workflow Counts (Still needed from PR table)
+    const [countRows] = await pool.query(`
+      SELECT
+        SUM(CASE WHEN workflow_status = 'Draft' THEN 1 ELSE 0 END) as draft,
+        SUM(CASE WHEN workflow_status = 'For Review' THEN 1 ELSE 0 END) as forReview,
+        SUM(CASE WHEN workflow_status = 'Approved' THEN 1 ELSE 0 END) as approved,
+        SUM(CASE WHEN workflow_status = 'Partially Obligated' THEN 1 ELSE 0 END) as partiallyObligated,
+        SUM(CASE WHEN workflow_status = 'Obligated' THEN 1 ELSE 0 END) as obligated,
+        SUM(CASE WHEN workflow_status = 'Rejected' THEN 1 ELSE 0 END) as rejected
+      FROM pr_so
+      WHERE is_deleted = 0
+    `);
 
-    const psRows = aggregateByDes(psRowsRaw);
-    const rlipRows = aggregateByDes(rlipRecords);
+    const totals = programRows.reduce((acc, row) => {
+      acc.psTotal += Number(row.total_ps || 0);
+      acc.rlipTotal += Number(row.total_rlip || 0);
+      acc.mooeTotal += Number(row.total_mooe || 0);
+      acc.grandTotal += Number(row.grand_total_allocation || 0);
+      acc.obligatedTotal += Number(row.total_obligated || 0);
+      return acc;
+    }, { psTotal: 0, rlipTotal: 0, mooeTotal: 0, grandTotal: 0, obligatedTotal: 0 });
 
-    const psTotal = psRows.reduce((sum, r) => sum + r.amount, 0);
-    const rlipTotal = rlipRows.reduce((sum, r) => sum + r.amount, 0);
-    const personnelTotal = psTotal + rlipTotal;
-
-    const mooeTotal = mooeItems.filter(m => !m.is_subtotal).reduce((sum, m) => sum + Number(m.totalFq || 0), 0);
-    const grandTotal = personnelTotal + mooeTotal;
-
-    // Build papComposition
-    const papCompositionMap = {};
-    const normalize = (s) => (s || "").trim();
-
-    psRecords.filter(r => r.cost_category === 'PS').forEach(item => {
-        const des = normalize(item.pap_des);
-        if (!des) return;
-        if (!papCompositionMap[des]) papCompositionMap[des] = { pap_des: des, ps: 0, rlip: 0, mooe: 0, co: 0, total: 0 };
-        papCompositionMap[des].ps += Number(item.amount || 0);
-    });
-
-    rlipRecords.forEach(item => {
-        const des = normalize(item.pap_des);
-        if (!des) return;
-        if (!papCompositionMap[des]) papCompositionMap[des] = { pap_des: des, ps: 0, rlip: 0, mooe: 0, co: 0, total: 0 };
-        papCompositionMap[des].rlip += Number(item.amount || 0);
-    });
-
-    mooeItems.filter(m => !m.is_subtotal).forEach(item => {
-        const des = normalize(item.pap_des);
-        if (!des) return;
-        if (!papCompositionMap[des]) papCompositionMap[des] = { pap_des: des, ps: 0, rlip: 0, mooe: 0, co: 0, total: 0 };
-        papCompositionMap[des].mooe += Number(item.totalFq || 0);
-    });
-
-    Object.values(papCompositionMap).forEach(v => {
-        v.total = v.ps + v.rlip + v.mooe + v.co;
-    });
+    const counts = countRows[0] || { draft: 0, forReview: 0, approved: 0, partiallyObligated: 0, obligated: 0, rejected: 0 };
 
     return {
-      psRows,
-      psTotal,
-      rlipRows,
-      rlipTotal,
-      personnelTotal,
-      mooe: mooeTotal,
-      grandTotal,
-      papComposition: Object.values(papCompositionMap),
-      obligated: { total: allObligations.reduce((sum, o) => sum + Number(o.amount || 0), 0) },
-      balance: { total: grandTotal - allObligations.reduce((sum, o) => sum + Number(o.amount || 0), 0) },
+      ps: totals.psTotal,
+      rlip: totals.rlipTotal,
+      psTotal: totals.psTotal,
+      rlipTotal: totals.rlipTotal,
+      personnelTotal: totals.psTotal + totals.rlipTotal,
+      mooe: totals.mooeTotal,
+      grandTotal: totals.grandTotal,
+      papComposition: papRows.map(r => ({
+        pap_des: r.pap_description,
+        type: r.pap_type,
+        ps: Number(r.ps || 0),
+        rlip: Number(r.rlip || 0),
+        mooe: Number(r.mooe || 0),
+        co: 0,
+        total: Number(r.total_allocation || 0),
+        obligated: Number(r.obligated || 0),
+        balance: Number(r.unobligated || 0)
+      })),
+      obligated: { total: totals.obligatedTotal },
+      balance: { total: totals.grandTotal - totals.obligatedTotal },
       counts: {
-        forReview: allPRs.filter(p => p.workflow_status === 'For Review').length,
-        approved: allPRs.filter(p => p.workflow_status === 'Approved').length,
-        partiallyObligated: allPRs.filter(p => p.workflow_status === 'Partially Obligated').length,
-        obligated: allPRs.filter(p => p.workflow_status === 'Obligated').length,
+        draft: Number(counts.draft || 0),
+        forReview: Number(counts.forReview || 0),
+        approved: Number(counts.approved || 0),
+        partiallyObligated: Number(counts.partiallyObligated || 0),
+        obligated: Number(counts.obligated || 0),
+        rejected: Number(counts.rejected || 0),
       },
-      utilization: grandTotal > 0 ? (allObligations.reduce((sum, o) => sum + Number(o.amount || 0), 0) / grandTotal) * 100 : 0
+      utilization: totals.grandTotal > 0 ? (totals.obligatedTotal / totals.grandTotal) * 100 : 0
     };
   }
 
