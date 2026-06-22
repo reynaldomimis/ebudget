@@ -7,35 +7,20 @@ const DataNormalizationEngine = require("../engines/DataNormalizationEngine");
 class MOOEService {
   static async createPlanWithMOOE(planInfo, mooeItems) {
     console.log("DEBUG: IMPORT SERVICE HIT");
+    const ImportEngine = require("../engines/ImportEngine");
     return await TransactionEngine.execute(async (connection) => {
-      const year = new Date().getFullYear();
-      const plan_id = `PLAN-${year}-${Date.now()}`;
+      const year = new Date(planInfo.planDate || Date.now()).getFullYear();
+      const plan_id = `MOOE-${year}-${Date.now()}`;
 
       const planData = {
         plan_id,
         year,
         title: planInfo.title,
-        range_label: planInfo.range_label || "Annual"
+        range_label: planInfo.range_label || "Annual",
+        planDate: planInfo.planDate
       };
 
-      await FiscalYearRepository.create(planData, connection);
-
-      for (const [index, item] of mooeItems.entries()) {
-        const mooeData = {
-          ...item,
-          plan_id,
-          plan_year: year,
-          sort_order: item.sort_order ?? index,
-          numbering: (index + 1).toString(),
-          office: DataNormalizationEngine.normalizeLabel(item.office || ""),
-          pap_type: DataNormalizationEngine.normalizeLabel(item.pap_type || ""),
-          pap_des: DataNormalizationEngine.normalizeLabel(item.pap_des || ""),
-          name: DataNormalizationEngine.normalizeLabel(item.name || ""),
-          expense_items: DataNormalizationEngine.normalizeLabel(item.expense_items || ""),
-          expense_items_sub: DataNormalizationEngine.normalizeLabel(item.expense_items_sub || "")
-        };
-        await MOOERepository.create(mooeData, connection);
-      }
+      await ImportEngine.importMOOE(planData, mooeItems, connection);
 
       await AuditEngine.log("MOOE_PLAN_CREATED", { plan_id, count: mooeItems.length });
       return { plan_id, mooeItems };

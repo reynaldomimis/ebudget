@@ -37,9 +37,34 @@ const GroupedTable = ({
 
   // ---------------- GROUP + FLATTEN ----------------
   const flattened = useMemo(() => {
+    // First, calculate numbering sequence for all records
+    let c1 = 0, c2 = 0, c3 = 0, c4 = 0;
+    const dataWithNumbers = filteredData.map((row) => {
+      if (row.is_subtotal) return { ...row, numbering: "" };
+
+      const ct = Number(row.count_type);
+      let num = "";
+
+      if (ct === 1) {
+        c1++; c2 = 0; c3 = 0; c4 = 0;
+        num = `${c1}`;
+      } else if (ct === 2) {
+        c2++; c3 = 0; c4 = 0;
+        num = `${c1}.${c2}`;
+      } else if (ct === 3) {
+        c3++; c4 = 0;
+        num = `${c1}.${c2}.${c3}`;
+      } else if (ct === 4) {
+        c4++;
+        num = `${c1}.${c2}.${c3}.${c4}`;
+      }
+
+      return { ...row, numbering: num };
+    });
+
     const grouped = {};
 
-    filteredData.forEach((row) => {
+    dataWithNumbers.forEach((row) => {
       const papType = row.pap_type || "Unknown PAP Type";
       const papDes = row.pap_des || "Unknown PAP Description";
 
@@ -66,11 +91,9 @@ const GroupedTable = ({
         const subtotalRows = rows.filter((r) => r.is_subtotal);
 
         if (level1 === "Program" || level1 === "") {
-          // Show all normal + subtotal rows
           flat.push(...normalRows);
           flat.push(...subtotalRows);
         } else if (level1 === "Office") {
-          // Show only normal rows; grand total added later
           flat.push(...normalRows);
         }
       });

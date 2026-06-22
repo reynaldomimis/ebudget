@@ -1,7 +1,17 @@
 import React, { useState, useRef } from "react";
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from "react-router-dom";
 import * as XLSX from "xlsx";
-import { Upload, CheckCircle, AlertCircle, ArrowRight, Wallet, UserCheck, History, RefreshCcw, Send } from "lucide-react";
+import {
+  Upload,
+  CheckCircle,
+  AlertCircle,
+  ArrowRight,
+  Wallet,
+  UserCheck,
+  History,
+  RefreshCcw,
+  Send,
+} from "lucide-react";
 import ToastService from "../../../services/ToastService";
 import { mooeAPI, psAPI } from "../../../services/api";
 import PageHeader from "../../../components/common/PageHeader";
@@ -15,7 +25,7 @@ import {
   removeNumberingPrefix,
   safeString,
   isSubTotalName,
-  programMap
+  programMap,
 } from "../../../utils/helper";
 import { convertToThousandsNumber } from "../../../utils/formatters";
 
@@ -34,12 +44,20 @@ const ImportCenter = () => {
   const fileInputRef = useRef(null);
 
   const detectImportType = (rows) => {
-    const headerContent = rows.slice(0, 15).map(row =>
-      row.map(cell => String(cell || "").toLowerCase()).join(" ")
-    ).join(" ");
+    const headerContent = rows
+      .slice(0, 15)
+      .map((row) =>
+        row.map((cell) => String(cell || "").toLowerCase()).join(" "),
+      )
+      .join(" ");
 
-    const isMOOE = headerContent.includes("physical targets") || headerContent.includes("financial targets");
-    const isPS = headerContent.includes("particulars") && headerContent.includes("total") && !isMOOE;
+    const isMOOE =
+      headerContent.includes("physical targets") ||
+      headerContent.includes("financial targets");
+    const isPS =
+      headerContent.includes("particulars") &&
+      headerContent.includes("total") &&
+      !isMOOE;
 
     if (isMOOE) return "MOOE";
     if (isPS) return "PS";
@@ -52,6 +70,11 @@ const ImportCenter = () => {
       setFile(selectedFile);
       processFile(selectedFile);
     }
+  };
+
+  // ── only triggered by the icon button ──
+  const handleIconClick = () => {
+    if (fileInputRef.current) fileInputRef.current.click();
   };
 
   const processFile = (file) => {
@@ -68,14 +91,18 @@ const ImportCenter = () => {
         const detectedType = detectImportType(jsonData);
 
         if (!detectedType) {
-          ToastService.toastError("Unrecognized Excel format! Please use the standard template.");
+          ToastService.toastError(
+            "Unrecognized Excel format! Please use the standard template.",
+          );
           setFile(null);
           setIsProcessing(false);
           return;
         }
 
         if (detectedType !== importType) {
-          ToastService.toastError(`Invalid File! You selected ${importType} but the uploaded file appears to be a ${detectedType} workplan.`);
+          ToastService.toastError(
+            `Invalid File! You selected ${importType} but the uploaded file appears to be a ${detectedType} workplan.`,
+          );
           setFile(null);
           setIsProcessing(false);
           if (fileInputRef.current) fileInputRef.current.value = "";
@@ -90,7 +117,10 @@ const ImportCenter = () => {
             .slice(startRow - 1, Math.min(endRow, jsonData.length))
             .map((row) => ({
               office: cleanString(row[0]),
-              name: [row[1], row[2], row[3], row[4]].map(cleanString).join(" ").trim(),
+              name: [row[1], row[2], row[3], row[4]]
+                .map(cleanString)
+                .join(" ")
+                .trim(),
               performance_indicator: cleanString(row[5]),
               pt1: parseInt(row[6]) || 0,
               pt2: parseInt(row[7]) || 0,
@@ -105,11 +135,15 @@ const ImportCenter = () => {
               fq4: parseFloat(row[16]) || 0,
               totalFq: parseFloat(row[17]) || 0,
               total_amount: parseFloat(row[17]) || 0,
-              sub_total_name: cleanString(row[1] || row[2] || row[15] || row[16]),
+              sub_total_name: cleanString(
+                row[1] || row[2] || row[15] || row[16],
+              ),
             }));
         } else {
-          let startRowIndex = jsonData.findIndex(row =>
-            String(row[0] || "").toLowerCase().includes("particulars")
+          let startRowIndex = jsonData.findIndex((row) =>
+            String(row[0] || "")
+              .toLowerCase()
+              .includes("particulars"),
           );
           if (startRowIndex === -1) startRowIndex = 4;
           else startRowIndex += 1;
@@ -123,26 +157,41 @@ const ImportCenter = () => {
             const rawName = String(row[0] || "").trim();
             if (!rawName) return acc;
 
-            const noisePatterns = [/total/i, /sub-total/i, /grand total/i, /ceiling/i, /difference/i, /^oo:/i, /^operations$/i];
-            if (noisePatterns.some(p => p.test(rawName))) return acc;
+            const noisePatterns = [
+              /total/i,
+              /sub-total/i,
+              /grand total/i,
+              /ceiling/i,
+              /difference/i,
+              /^oo:/i,
+              /^operations$/i,
+            ];
+            if (noisePatterns.some((p) => p.test(rawName))) return acc;
 
-            // Detect RLIP Section
-            const isRlipHeader = rawName.toUpperCase().includes("RETIREMENT AND LIFE INSURANCE PREMIUMS") || rawName.toUpperCase().includes("(RLIP)");
+            const isRlipHeader =
+              rawName
+                .toUpperCase()
+                .includes("RETIREMENT AND LIFE INSURANCE PREMIUMS") ||
+              rawName.toUpperCase().includes("(RLIP)");
             if (isRlipHeader) {
-                currentCostCategory = "RLIP";
+              currentCostCategory = "RLIP";
             }
 
             const totalVal = parseFloat(row[1]) || 0;
             const isNumberedAccount = /^\d+\./.test(rawName);
-            const cleanName = rawName.replace(/^\d+\.\s*/, "").replace(/^\d{10,}\s*/, "").trim();
+            const cleanName = rawName
+              .replace(/^\d+\.\s*/, "")
+              .replace(/^\d{10,}\s*/, "")
+              .trim();
 
             if (isNumberedAccount || totalVal > 0) {
-              // Rule: If in RLIP section, the item name IS the actual PAP Description
-              const finalPapDes = currentCostCategory === "RLIP" ? cleanName : currentPapDes;
+              const finalPapDes =
+                currentCostCategory === "RLIP" ? cleanName : currentPapDes;
 
               acc.push({
                 name: cleanName,
-                expense_items: currentCostCategory === "RLIP" ? "RLIP" : cleanName,
+                expense_items:
+                  currentCostCategory === "RLIP" ? "RLIP" : cleanName,
                 total_amount: totalVal,
                 is_ps_expense: true,
                 is_header: false,
@@ -150,19 +199,29 @@ const ImportCenter = () => {
                 pap_des: finalPapDes,
                 pap_des_code: currentPapDesCode,
                 cost_category: currentCostCategory,
-                aggregation_level: "ITEM"
+                rawName: rawName,
               });
             } else {
-              if (isRlipHeader) return acc; // Skip storing the header row itself to avoid "fake" PAP descriptions
+              if (isRlipHeader) {
+                acc.push({
+                  name: rawName,
+                  isSectionHeader: true,
+                  cost_category: "RLIP",
+                });
+                return acc;
+              }
 
               const upperName = cleanName.toUpperCase();
               let aggregationLevel = "ITEM";
 
-              if (upperName.includes("NATIONAL NUTRITION MANAGEMENT PROGRAM") || upperName.includes("GENERAL ADMINISTRATION AND SUPPORT")) {
+              if (
+                upperName.includes("NATIONAL NUTRITION MANAGEMENT PROGRAM") ||
+                upperName.includes("GENERAL ADMINISTRATION AND SUPPORT")
+              ) {
                 currentPapType = upperName;
                 currentPapDes = "";
                 currentPapDesCode = "";
-                currentCostCategory = "PS"; // Reset cost category when major type changes
+                currentCostCategory = "PS";
                 aggregationLevel = "PAP_TYPE";
               } else {
                 const codeMatch = rawName.match(/^(\d{10,})\s+(.*)$/);
@@ -175,7 +234,9 @@ const ImportCenter = () => {
                 }
                 aggregationLevel = "PAP_DESCRIPTION";
               }
-              const isMajor = upperName.includes("NATIONAL NUTRITION MANAGEMENT PROGRAM") || upperName.includes("GENERAL ADMINISTRATION AND SUPPORT");
+              const isMajor =
+                upperName.includes("NATIONAL NUTRITION MANAGEMENT PROGRAM") ||
+                upperName.includes("GENERAL ADMINISTRATION AND SUPPORT");
               acc.push({
                 name: cleanName,
                 expense_items: cleanName,
@@ -184,7 +245,6 @@ const ImportCenter = () => {
                 pap_des: currentPapDes,
                 pap_des_code: currentPapDesCode,
                 cost_category: currentCostCategory,
-                aggregation_level: aggregationLevel,
                 is_header: true,
                 isHeader: isMajor,
                 isSubHeader: !isMajor,
@@ -195,7 +255,9 @@ const ImportCenter = () => {
         }
 
         setTableData(formattedData);
-        ToastService.toastSuccess(`Validated ${importType} file. ${formattedData.length} records ready.`);
+        ToastService.toastSuccess(
+          `Validated ${importType} file. ${formattedData.length} records ready.`,
+        );
       } catch (err) {
         ToastService.toastError("Error processing file: " + err.message);
       } finally {
@@ -211,8 +273,15 @@ const ImportCenter = () => {
       return;
     }
 
-    let refMain = "", refMiddle = "", refCenter = "", refLast = "";
-    let lastPapType = "", lastPapDes = "", lastOffice = "", lastName = "", lastExpenseItem = "";
+    let refMain = "",
+      refMiddle = "",
+      refCenter = "",
+      refLast = "";
+    let lastPapType = "",
+      lastPapDes = "",
+      lastOffice = "",
+      lastName = "",
+      lastExpenseItem = "";
 
     const rebuiltData = tableData.reduce((acc, row) => {
       const rawName = row.name || "";
@@ -224,7 +293,12 @@ const ImportCenter = () => {
 
       if (papTypeMatch || lastPapType === "") {
         if (papTypeMatch && papTypeMatch !== lastPapType) {
-          refMain = ""; refMiddle = ""; refCenter = ""; refLast = ""; lastName = ""; lastExpenseItem = "";
+          refMain = "";
+          refMiddle = "";
+          refCenter = "";
+          refLast = "";
+          lastName = "";
+          lastExpenseItem = "";
         }
         lastPapType = papTypeMatch || lastPapType;
       }
@@ -233,39 +307,75 @@ const ImportCenter = () => {
         lastExpenseItem = "";
       }
 
-      if (safeString(cleanedName) === safeString(lastPapType) || safeString(cleanedName) === safeString(lastPapDes)) return acc;
+      if (
+        safeString(cleanedName) === safeString(lastPapType) ||
+        safeString(cleanedName) === safeString(lastPapDes)
+      )
+        return acc;
 
       const office = row.office || lastOffice;
       if (row.office) lastOffice = row.office;
 
       const finalName = cleanedName || lastName;
       if (safeString(cleanedName)) {
-        if (hierarchyLevel === 1) { refMain = cleanedName; refMiddle = ""; refCenter = ""; refLast = ""; lastExpenseItem = ""; }
-        else if (hierarchyLevel === 2) { refMiddle = cleanedName; refCenter = ""; refLast = ""; lastExpenseItem = ""; }
-        else if (hierarchyLevel === 3) { refCenter = cleanedName; refLast = ""; lastExpenseItem = ""; }
-        else if (hierarchyLevel >= 4) { refLast = cleanedName; lastExpenseItem = ""; }
+        if (hierarchyLevel === 1) {
+          refMain = cleanedName;
+          refMiddle = "";
+          refCenter = "";
+          refLast = "";
+          lastExpenseItem = "";
+        } else if (hierarchyLevel === 2) {
+          refMiddle = cleanedName;
+          refCenter = "";
+          refLast = "";
+          lastExpenseItem = "";
+        } else if (hierarchyLevel === 3) {
+          refCenter = cleanedName;
+          refLast = "";
+          lastExpenseItem = "";
+        } else if (hierarchyLevel >= 4) {
+          refLast = cleanedName;
+          lastExpenseItem = "";
+        }
 
         if (cleanedName !== lastName) {
-            lastExpenseItem = "";
+          lastExpenseItem = "";
         }
         lastName = cleanedName;
       }
 
-      const expense_items = row.expense_items || lastExpenseItem;
+      const expense_items = removeNumberingPrefix(
+        row.expense_items || lastExpenseItem,
+      );
       if (row.expense_items) lastExpenseItem = row.expense_items;
+
+      const expense_items_sub = removeNumberingPrefix(
+        row.expense_items_sub || "",
+      );
+
+      let finalCountType = hierarchyLevel;
+      if (hierarchyLevel === 0 && !isSubtotal) {
+        if (expense_items_sub || row.total_amount > 0 || lastExpenseItem) {
+          finalCountType = 4;
+        }
+      }
 
       acc.push({
         ...row,
-        count_type: hierarchyLevel,
+        count_type: finalCountType,
         office,
         pap_type: lastPapType,
         pap_des: lastPapDes,
-        name: finalName,
+        name: removeNumberingPrefix(finalName),
+        performance_indicator: removeNumberingPrefix(
+          row.performance_indicator || "",
+        ),
         expense_items,
-        ref_main_name: refMain,
-        ref_middle_name: refMiddle,
-        ref_center_name: refCenter,
-        ref_last_name: refLast,
+        expense_items_sub,
+        ref_main_name: removeNumberingPrefix(refMain),
+        ref_middle_name: removeNumberingPrefix(refMiddle),
+        ref_center_name: removeNumberingPrefix(refCenter),
+        ref_last_name: removeNumberingPrefix(refLast),
         is_subtotal: isSubtotal,
       });
       return acc;
@@ -278,25 +388,40 @@ const ImportCenter = () => {
   const handleUploadFinal = async (planData) => {
     setIsUploading(true);
     try {
-      const isPS = planData.allotmentType === "PS";
+      const isPS = importType === "PS";
       const records = tableData
         .filter((row) => !row.is_header)
         .map((row, index) => {
-          const rawValue = (val) => Number(String(val || 0).replace(/,/g, "")) || 0;
-          return {
+          const rawValue = (val) => {
+            if (val == null || val === "") return 0;
+            return Number(String(val).replace(/,/g, "")) || 0;
+          };
+
+          const baseData = {
             ...row,
             fq1: isPS ? rawValue(row.fq1) : convertToThousandsNumber(row.fq1),
             fq2: isPS ? rawValue(row.fq2) : convertToThousandsNumber(row.fq2),
             fq3: isPS ? rawValue(row.fq3) : convertToThousandsNumber(row.fq3),
             fq4: isPS ? rawValue(row.fq4) : convertToThousandsNumber(row.fq4),
-            totalFq: isPS ? rawValue(row.totalFq) : convertToThousandsNumber(row.totalFq),
-            total_amount: isPS ? rawValue(row.total_amount) : convertToThousandsNumber(row.total_amount),
+            totalFq: isPS
+              ? rawValue(row.totalFq)
+              : convertToThousandsNumber(row.totalFq),
+            total_amount: isPS
+              ? rawValue(row.total_amount)
+              : convertToThousandsNumber(row.total_amount),
             amount: isPS ? rawValue(row.total_amount) : 0,
             total: isPS ? rawValue(row.total_amount) : 0,
             sort_order: index,
-            plan_year: new Date(planData.planDate).getFullYear(),
-            allotment_class: planData.allotmentType,
           };
+
+          if (!isPS) {
+            return {
+              ...baseData,
+              allotment_class: planData.allotmentType,
+              plan_id: planData.plan_id,
+            };
+          }
+          return baseData;
         });
 
       if (isPS) {
@@ -316,7 +441,11 @@ const ImportCenter = () => {
         });
       }
 
-      setImportSummary({ count: records.length, type: planData.allotmentType, date: new Date().toLocaleString() });
+      setImportSummary({
+        count: records.length,
+        type: planData.allotmentType,
+        date: new Date().toLocaleString(),
+      });
       setStep(4);
       ToastService.toastSuccess("Import successful!");
     } catch (err) {
@@ -328,7 +457,11 @@ const ImportCenter = () => {
     }
   };
 
-  const steps = [{ id: 1, title: "SELECT TYPE" }, { id: 2, title: "UPLOAD & PROCESS" }, { id: 3, title: "REVIEW & CONFIRM" }];
+  const steps = [
+    { id: 1, title: "SELECT TYPE" },
+    { id: 2, title: "UPLOAD & PROCESS" },
+    { id: 3, title: "REVIEW & CONFIRM" },
+  ];
 
   return (
     <div className="w-full animate-in fade-in duration-700">
@@ -342,65 +475,143 @@ const ImportCenter = () => {
         {steps.map((s, idx) => (
           <React.Fragment key={s.id}>
             <div className="flex items-center gap-3">
-              <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm transition-all duration-500 ${step === s.id ? 'bg-emerald-600 text-white shadow-lg ring-4 ring-emerald-50' : step > s.id ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-400'}`}>
+              <div
+                className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm transition-all duration-500 ${step === s.id ? "bg-emerald-600 text-white shadow-lg ring-4 ring-emerald-50" : step > s.id ? "bg-emerald-100 text-emerald-600" : "bg-slate-100 text-slate-400"}`}
+              >
                 {step > s.id ? <CheckCircle size={20} /> : s.id}
               </div>
-              <span className={`text-[11px] font-black uppercase tracking-[0.1em] ${step >= s.id ? 'text-slate-900' : 'text-slate-300'}`}>{s.title}</span>
+              <span
+                className={`text-[11px] font-black uppercase tracking-[0.1em] ${step >= s.id ? "text-slate-900" : "text-slate-300"}`}
+              >
+                {s.title}
+              </span>
             </div>
-            {idx < steps.length - 1 && <div className="w-20 h-px bg-slate-100 mx-2"></div>}
+            {idx < steps.length - 1 && (
+              <div className="w-20 h-px bg-slate-100 mx-2"></div>
+            )}
           </React.Fragment>
         ))}
       </div>
 
       <div className="bg-white rounded-[32px] border border-slate-100 shadow-[0_20px_50px_rgba(0,0,0,0.05)] overflow-hidden min-h-[450px] flex flex-col mx-auto w-full transition-all">
+        {/* ── STEP 1 ── */}
         {step === 1 && (
           <div className="p-12 flex-1 flex flex-col items-center justify-center text-center">
-            <h3 className="text-xl font-black text-slate-900 mb-8 uppercase tracking-tight">Select Allotment Class</h3>
+            <h3 className="text-xl font-black text-slate-900 mb-8 uppercase tracking-tight">
+              Select Allotment Class
+            </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-2xl">
-              <button onClick={() => { setImportType('PS'); setStep(2); }} className={`p-10 rounded-3xl border-2 transition-all duration-300 text-left group relative overflow-hidden ${importType === 'PS' ? 'border-emerald-500 bg-emerald-50/30' : 'border-slate-100 hover:border-emerald-200 hover:bg-slate-50'}`}>
-                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-6 transition-all duration-500 ${importType === 'PS' ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-400'}`}>
+              <button
+                onClick={() => {
+                  setImportType("PS");
+                  setStep(2);
+                }}
+                className={`p-10 rounded-3xl border-2 transition-all duration-300 text-left group relative overflow-hidden ${importType === "PS" ? "border-emerald-500 bg-emerald-50/30" : "border-slate-100 hover:border-emerald-200 hover:bg-slate-50"}`}
+              >
+                <div
+                  className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-6 transition-all duration-500 ${importType === "PS" ? "bg-emerald-500 text-white" : "bg-slate-100 text-slate-400"}`}
+                >
                   <UserCheck size={28} />
                 </div>
-                <h4 className="font-black text-slate-900 text-lg mb-2">Personal Services (PS)</h4>
-                <p className="text-xs text-slate-500 font-medium leading-relaxed">Salaries, allowances, and benefits.</p>
+                <h4 className="font-black text-slate-900 text-lg mb-2">
+                  Personal Services (PS)
+                </h4>
+                <p className="text-xs text-slate-500 font-medium leading-relaxed">
+                  Salaries, allowances, and benefits.
+                </p>
               </button>
-              <button onClick={() => { setImportType('MOOE'); setStep(2); }} className={`p-10 rounded-3xl border-2 transition-all duration-300 text-left group relative overflow-hidden ${importType === 'MOOE' ? 'border-emerald-500 bg-emerald-50/30' : 'border-slate-100 hover:border-emerald-200 hover:bg-slate-50'}`}>
-                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-6 transition-all duration-500 ${importType === 'MOOE' ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-400'}`}>
+              <button
+                onClick={() => {
+                  setImportType("MOOE");
+                  setStep(2);
+                }}
+                className={`p-10 rounded-3xl border-2 transition-all duration-300 text-left group relative overflow-hidden ${importType === "MOOE" ? "border-emerald-500 bg-emerald-50/30" : "border-slate-100 hover:border-emerald-200 hover:bg-slate-50"}`}
+              >
+                <div
+                  className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-6 transition-all duration-500 ${importType === "MOOE" ? "bg-emerald-500 text-white" : "bg-slate-100 text-slate-400"}`}
+                >
                   <Wallet size={28} />
                 </div>
                 <h4 className="font-black text-slate-900 text-lg mb-2">MOOE</h4>
-                <p className="text-xs text-slate-500 font-medium leading-relaxed">Maintenance and Operating Expenses.</p>
+                <p className="text-xs text-slate-500 font-medium leading-relaxed">
+                  Maintenance and Operating Expenses.
+                </p>
               </button>
             </div>
           </div>
         )}
 
+        {/* ── STEP 2 ── */}
         {step === 2 && (
           <div className="p-12 flex-1 flex flex-col items-center justify-center">
-            <label className="flex flex-col items-center cursor-pointer group w-full">
-              <input type="file" className="hidden" onChange={handleFileChange} accept=".xlsx,.xls,.csv" />
-              <div className="w-20 h-20 bg-slate-50 rounded-[24px] flex items-center justify-center mb-6 group-hover:bg-emerald-100 transition-colors shadow-inner border border-slate-100">
-                <Upload size={32} className="text-slate-300 group-hover:text-emerald-600" />
-              </div>
-              <h3 className="text-2xl font-black text-slate-900 mb-2">Upload {importType} Allotment File</h3>
-              <p className="text-slate-400 text-sm font-medium mb-10">Click here to browse your standard .xlsx workplan.</p>
-              <div className="w-full max-w-xl aspect-[2/1] border-4 border-dashed border-slate-100 rounded-[32px] bg-slate-50/50 flex flex-col items-center justify-center p-12 hover:border-emerald-200 hover:bg-white transition-all shadow-inner group">
-                <p className="font-black text-slate-400 text-xs uppercase tracking-[0.2em] group-hover:text-emerald-600 text-center">{file ? file.name : "Select Microsoft Excel File"}</p>
-              </div>
-            </label>
-            <div className="mt-10 flex gap-6">
-              <button onClick={() => setStep(1)} className="text-sm font-black uppercase tracking-widest text-slate-400 hover:text-slate-900">Cancel</button>
-              <button disabled={!file || isProcessing} onClick={() => setStep(3)} className="px-10 py-4 bg-slate-900 text-white rounded-xl text-xs font-black uppercase tracking-[0.2em] shadow-2xl hover:bg-emerald-600 transition-all disabled:opacity-20">{isProcessing ? "Processing..." : "Process Workplan"}</button>
+            {/* Hidden file input — triggered only by icon button */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              className="hidden"
+              onChange={handleFileChange}
+              accept=".xlsx,.xls,.csv"
+            />
+
+            <div className="flex flex-col items-center w-full">
+              {/* Icon button — ONLY this triggers file picker */}
+              <button
+                type="button"
+                onClick={handleIconClick}
+                className="w-24 h-24 bg-slate-50 rounded-[32px] flex items-center justify-center mb-8 hover:bg-emerald-100 transition-all duration-300 shadow-inner border border-slate-100 group active:scale-90"
+                aria-label="Browse file"
+              >
+                <Upload
+                  size={40}
+                  className="text-slate-300 group-hover:text-emerald-600 transition-colors"
+                />
+              </button>
+
+              <h3 className="text-2xl font-black text-slate-900 mb-2">
+                Upload {importType} Allotment File
+              </h3>
+              <p className="text-slate-400 text-sm font-medium mb-4">
+                Click the icon above to browse your standard .xlsx workplan.
+              </p>
+
+              {file && (
+                <div className="bg-emerald-50 px-4 py-2 rounded-xl border border-emerald-100 animate-in fade-in zoom-in duration-300">
+                  <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">
+                    Selected: {file.name}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <div className="mt-12 flex gap-6">
+              <button
+                onClick={() => setStep(1)}
+                className="text-sm font-black uppercase tracking-widest text-slate-400 hover:text-slate-900"
+              >
+                Cancel
+              </button>
+              <button
+                disabled={!file || isProcessing}
+                onClick={() => setStep(3)}
+                className="px-10 py-4 bg-slate-900 text-white rounded-xl text-xs font-black uppercase tracking-[0.2em] shadow-2xl hover:bg-emerald-600 transition-all disabled:opacity-20"
+              >
+                {isProcessing ? "Processing..." : "Process Workplan"}
+              </button>
             </div>
           </div>
         )}
 
+        {/* ── STEP 3 ── */}
         {step === 3 && (
           <div className="flex-1 flex flex-col overflow-hidden bg-white">
             <div className="p-6 border-b border-slate-50 bg-slate-50/50 flex justify-between items-center px-8">
               <div>
-                <h3 className="text-lg font-black text-slate-900 tracking-tight uppercase">Review Data Registry</h3>
-                <p className="text-[10px] font-black text-emerald-600 mt-1 uppercase tracking-widest">{importType} • {tableData.length} records detected</p>
+                <h3 className="text-lg font-black text-slate-900 tracking-tight uppercase">
+                  Review Data Registry
+                </h3>
+                <p className="text-[10px] font-black text-emerald-600 mt-1 uppercase tracking-widest">
+                  {importType} • {tableData.length} records detected
+                </p>
               </div>
               <div className="flex gap-4">
                 <button
@@ -408,7 +619,10 @@ const ImportCenter = () => {
                   onClick={handleRebuild}
                   className="flex items-center gap-2 px-5 py-2.5 bg-white border border-slate-200 rounded-xl text-[10px] font-black uppercase tracking-widest text-slate-600 hover:bg-slate-50 shadow-sm transition-all disabled:opacity-30 disabled:cursor-not-allowed"
                 >
-                  <RefreshCcw size={14} className={isProcessing ? "animate-spin" : ""} />
+                  <RefreshCcw
+                    size={14}
+                    className={isProcessing ? "animate-spin" : ""}
+                  />
                   Rebuild Structure
                 </button>
                 <button
@@ -424,23 +638,47 @@ const ImportCenter = () => {
 
             <div className="flex-1 overflow-auto bg-slate-50/30 p-4">
               {showTable ? (
-                importType === "PS" ? <PSTable data={tableData} /> : <GroupedTable data={tableData} tableLabel={`MOOE Preview`} interactive={false} />
+                importType === "PS" ? (
+                  <PSTable data={tableData} />
+                ) : (
+                  <GroupedTable
+                    data={tableData}
+                    tableLabel={`MOOE Preview`}
+                    interactive={false}
+                  />
+                )
               ) : (
                 <div className="h-full flex flex-col items-center justify-center text-center p-20 bg-white rounded-[24px] border border-slate-100 border-dashed">
-                  <RefreshCcw size={48} className="text-slate-200 mb-4 animate-spin-slow" />
-                  <h4 className="text-lg font-black text-slate-900">Structure Ready</h4>
-                  <p className="text-slate-500 text-sm max-w-md mt-2">Click the <b>Rebuild Structure</b> button to organize the raw Excel data into the official registry format.</p>
+                  <RefreshCcw
+                    size={48}
+                    className="text-slate-200 mb-4 animate-spin-slow"
+                  />
+                  <h4 className="text-lg font-black text-slate-900">
+                    Structure Ready
+                  </h4>
+                  <p className="text-slate-500 text-sm max-w-md mt-2">
+                    Click the <b>Rebuild Structure</b> button to organize the
+                    raw Excel data into the official registry format.
+                  </p>
                 </div>
               )}
             </div>
           </div>
         )}
 
+        {/* ── STEP 4 ── */}
         {step === 4 && (
           <div className="p-12 flex-1 flex flex-col items-center justify-center text-center animate-in zoom-in duration-500">
-            <div className="w-24 h-24 bg-emerald-50 text-emerald-500 rounded-[40px] flex items-center justify-center mb-8 shadow-inner"><CheckCircle size={56} /></div>
-            <h3 className="text-3xl font-black text-slate-900 mb-2 tracking-tight">Import Successful!</h3>
-            <p className="text-slate-500 font-medium max-w-sm mb-10">Your {importSummary?.type} allotment records have been successfully added.</p>
+            <div className="w-24 h-24 bg-emerald-50 text-emerald-500 rounded-[40px] flex items-center justify-center mb-8 shadow-inner">
+              <CheckCircle size={56} />
+            </div>
+            <h3 className="text-3xl font-black text-slate-900 mb-2 tracking-tight">
+              Import Successful!
+            </h3>
+            <p className="text-slate-500 font-medium max-w-sm mb-10">
+              Your {importSummary?.type} allotment records have been
+              successfully added.
+            </p>
             <div className="flex justify-center gap-4">
               <button
                 onClick={() => {
@@ -454,7 +692,7 @@ const ImportCenter = () => {
                 Import Another
               </button>
               <button
-                onClick={() => navigate('/registry')}
+                onClick={() => navigate("/registry")}
                 className="px-10 py-4 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-xl hover:bg-emerald-600 transition-all active:scale-95 flex items-center gap-2"
               >
                 View Registry <ArrowRight size={16} />
@@ -464,12 +702,19 @@ const ImportCenter = () => {
         )}
       </div>
 
-      <SubmitPlanInfoModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} onSubmit={handleUploadFinal} submitDisabled={!showTable} title="Confirm Allotment Registration" initialAllotmentType={importType} />
+      <SubmitPlanInfoModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onSubmit={handleUploadFinal}
+        submitDisabled={!showTable}
+        title="Confirm Allotment Registration"
+        initialAllotmentType={importType}
+      />
 
       <div className="flex justify-center mt-12 pb-20">
-         <button className="flex items-center gap-3 text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 hover:text-emerald-600 transition-all group">
-            <History size={16} /> View Full Import History
-         </button>
+        <button className="flex items-center gap-3 text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 hover:text-emerald-600 transition-all group">
+          <History size={16} /> View Full Import History
+        </button>
       </div>
     </div>
   );

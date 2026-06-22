@@ -163,12 +163,17 @@ export const isSubTotalName = (name) => {
   return keywords.some((keyword) => normalize(name) === normalize(keyword));
 };
 
-// Removes numbering prefixes like 1., 1.2, 1.2.3 from the start of a string
+// Removes numbering prefixes like 1., 1.2, a., b., i., ii. from the start of a string
 export const removeNumberingPrefix = (name) => {
   if (!name) return "";
 
   return name
-    .replace(/^\d+(\.\d+)*\.?/, "")
+    // 1. Tanggalin ang hierarchical numbers (1., 1.1) na sinusundan ng space
+    .replace(/^(\d+(\.\d+)*)\.?\s+/, "")
+    // 2. Tanggalin ang alphabetical/roman prefixes (a., b., i.) - kahit walang space o may dot/parenthesis
+    .replace(/^([a-z]|[ivx]+)[\.\)]\s*/i, "")
+    // 3. Tanggalin ang leading dashes o bullets
+    .replace(/^[-•]\s*/, "")
     .replace(/\s+/g, " ")
     .trim();
 };
@@ -201,7 +206,6 @@ export const matchProgram = (input, type) => {
       Array.isArray(values) &&
       values.some((v) => normalize(v) === target)
     ) {
-      // ← returning original input is usually better than normalized
       return input;
     }
   }
@@ -247,16 +251,11 @@ export const getValidatedRowValuesDynamic = (
 export const getHierarchyLevel = (name) => {
   if (!name || typeof name !== "string") return 0;
 
-  // Extract the prefix up to the first character that is not a number or dot
-  const prefixMatch = name.trim().match(/^[\d.]+/);
+  const prefixMatch = name.trim().match(/^(\d+(\.\d+)*)\.?\s+/);
   if (!prefixMatch) return 0;
 
-  const prefix = prefixMatch[0];
-
-  // Split the prefix into segments by dots, ignoring empty segments from consecutive dots
-  const segments = prefix
-    .split(".")
-    .filter((segment) => segment.trim() !== "" && !isNaN(Number(segment))); // siguradong number lang
+  const prefix = prefixMatch[1];
+  const segments = prefix.split(".").filter((s) => s !== "");
 
   return segments.length;
 };

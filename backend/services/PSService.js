@@ -8,7 +8,7 @@ class PSService {
     console.log("DEBUG: PS IMPORT SERVICE HIT");
     return await TransactionEngine.execute(async (connection) => {
       const year = new Date().getFullYear();
-      const plan_id = `PLAN-PS-${year}-${Date.now()}`;
+      const plan_id = `PS-${year}-${Date.now()}`;
 
       const planData = {
         plan_id,
@@ -19,23 +19,10 @@ class PSService {
 
       await FiscalYearRepository.create(planData, connection);
 
-      const DataNormalizationEngine = require("../engines/DataNormalizationEngine");
-      for (const item of psItems) {
-        const psData = {
-          ...item,
-          plan_id,
-          plan_year: year,
-          pap_type: DataNormalizationEngine.normalizeLabel(item.pap_type || ""),
-          pap_des: DataNormalizationEngine.normalizeLabel(item.pap_des || ""),
-          cost_category: item.cost_category || "PS",
-          aggregation_level: item.aggregation_level || "ITEM",
-          is_subtotal: item.is_subtotal || 0,
-          subtotal_label: item.subtotal_label || "",
-          report_order: item.report_order || 0,
-          expense_items: DataNormalizationEngine.normalizeLabel(item.expense_items || "")
-        };
-        await PSRepository.create(psData, connection);
-      }
+      const ImportEngine = require("../engines/ImportEngine");
+      // Use ImportEngine to handle strict RLIP separation
+      const recordsWithPlanId = psItems.map(item => ({ ...item, plan_id }));
+      await ImportEngine.importPS(recordsWithPlanId, connection);
 
       await AuditEngine.log("PS_PLAN_CREATED", { plan_id, count: psItems.length });
       return { plan_id, psItems };

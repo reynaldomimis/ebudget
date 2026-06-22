@@ -72,7 +72,7 @@ const StatCard = ({ title, value, subValue, icon: Icon, variant = 'default', loa
 /* ─── PERSONAL SERVICES (PS) TABLE ───────────────────────── */
 const PSTableSummary = ({ summary, loading }) => {
   if (loading) return <Skeleton className="h-64 rounded-2xl" />;
-  if (!summary || !Array.isArray(summary.papComposition)) {
+  if (!summary || !Array.isArray(summary.psRows)) {
       return (
           <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-10 text-center text-slate-400 text-xs font-black uppercase">
             No PS Data Available
@@ -81,13 +81,13 @@ const PSTableSummary = ({ summary, loading }) => {
   }
 
   const cell = (val) =>
-    val > 0 ? <span className="font-mono">{formatPHP(val)}</span> : <span className="text-slate-300">—</span>;
+    val > 0 ? <span className="font-mono">₱{formatPHP(val)}</span> : <span className="text-slate-300">—</span>;
 
   return (
     <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden flex flex-col h-full shadow-sm">
       <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-700 flex items-center gap-2 bg-slate-50/50 dark:bg-slate-900/50">
         <PieChart size={14} className="text-slate-400" />
-        <h4 className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">PERSONAL SERVICES (PS) SUMMARY</h4>
+        <h4 className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">PERSONAL SERVICES (PS)</h4>
       </div>
 
       <div className="overflow-x-auto">
@@ -95,34 +95,41 @@ const PSTableSummary = ({ summary, loading }) => {
           <thead>
             <tr className="bg-white dark:bg-slate-800 border-b border-slate-50 dark:border-slate-700">
               <th className="px-5 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">PAP Description</th>
-              <th className="px-5 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest text-right">PS</th>
-              <th className="px-5 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest text-right">RLIP</th>
-              <th className="px-5 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest text-right">Grand Total</th>
+              <th className="px-5 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest text-right">Amount</th>
             </tr>
           </thead>
           <tbody>
-            {summary.papComposition.map((row, idx) => {
-              const psVal = Number(row.ps || 0);
-              const rlipVal = Number(row.rlip || 0);
-              if (psVal === 0 && rlipVal === 0) return null;
-              return (
-                <tr key={idx} className="border-b border-slate-50 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors">
-                  <td className="px-5 py-3 text-[10px] font-bold text-slate-600 dark:text-slate-300 uppercase leading-tight">{row.pap_des}</td>
-                  <td className="px-5 py-3 text-right text-[11px] text-slate-500 dark:text-slate-400">{cell(psVal)}</td>
-                  <td className="px-5 py-3 text-right text-[11px] text-slate-500 dark:text-slate-400">{cell(rlipVal)}</td>
-                  <td className="px-5 py-3 text-right text-[11px] font-bold text-slate-700 dark:text-slate-200">{cell(psVal + rlipVal)}</td>
-                </tr>
-              );
-            })}
-            <tr className="bg-emerald-50/40 dark:bg-emerald-900/10 border-t border-slate-200 dark:border-slate-700 font-black">
-              <td className="px-5 py-3 text-[11px] text-emerald-700 dark:text-emerald-400">TOTAL (PS)</td>
-              <td className="px-5 py-3 text-right text-[11px] text-emerald-700 dark:text-emerald-400">{cell(summary.ps)}</td>
-              <td className="px-5 py-3 text-[11px] text-emerald-700 dark:text-emerald-400">TOTAL (RLIP)</td>
-              <td className="px-5 py-3 text-right text-[11px] text-emerald-700 dark:text-emerald-400">{cell(summary.rlip)}</td>
+            {/* PS Section */}
+            {summary.psRows.map((row, idx) => (
+              <tr key={`ps-${idx}`} className="border-b border-slate-50 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors">
+                <td className="px-5 py-3 text-[10px] font-bold text-slate-600 dark:text-slate-300 uppercase leading-tight">{row.pap_des}</td>
+                <td className="px-5 py-3 text-right text-[11px] text-slate-500 dark:text-slate-400">{cell(row.amount)}</td>
+              </tr>
+            ))}
+            <tr className="bg-slate-50/50 dark:bg-slate-900/20 border-t border-slate-200 dark:border-slate-700 font-bold text-slate-900 dark:text-white">
+              <td className="px-5 py-3 text-[11px] uppercase">Total, PS</td>
+              <td className="px-5 py-3 text-right text-[11px] font-mono">{cell(summary.psTotal)}</td>
             </tr>
-            <tr className="bg-emerald-100/30 dark:bg-emerald-900/20">
-              <td colSpan="3" className="px-5 py-3 text-[11px] font-black text-emerald-800 dark:text-emerald-300 text-right uppercase">Grand Total Personnel Services</td>
-              <td className="px-5 py-3 text-right text-[12px] font-black text-emerald-800 dark:text-emerald-300 font-mono underline decoration-double decoration-emerald-500">{cell(summary.personnelTotal)}</td>
+
+            {/* RLIP Section */}
+            <tr className="bg-slate-100/50 dark:bg-slate-700/30">
+              <td colSpan="2" className="px-5 py-3 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest italic">Retirement and Life Insurance Premiums (RLIP)</td>
+            </tr>
+            {summary.rlipRows.map((row, idx) => (
+              <tr key={`rlip-${idx}`} className="border-b border-slate-50 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors">
+                <td className="px-5 py-3 text-[10px] font-bold text-slate-600 dark:text-slate-300 uppercase leading-tight italic pl-10">{row.pap_des}</td>
+                <td className="px-5 py-3 text-right text-[11px] text-slate-500 dark:text-slate-400 italic">{cell(row.amount)}</td>
+              </tr>
+            ))}
+            <tr className="bg-slate-50/50 dark:bg-slate-900/20 border-t border-slate-200 dark:border-slate-700 font-bold text-slate-900 dark:text-white italic">
+              <td className="px-5 py-3 text-[11px] uppercase pl-10">Total, RLIP</td>
+              <td className="px-5 py-3 text-right text-[11px] font-mono">{cell(summary.rlipTotal)}</td>
+            </tr>
+
+            {/* Grand Total Personnel */}
+            <tr className="bg-emerald-50/40 dark:bg-emerald-900/20 border-t-2 border-slate-900 dark:border-slate-600">
+              <td className="px-5 py-4 text-[11px] font-black text-emerald-800 dark:text-emerald-300 uppercase">Grand Total, PS + RLIP</td>
+              <td className="px-5 py-4 text-right text-[12px] font-black text-emerald-800 dark:text-emerald-300 font-mono underline decoration-double decoration-emerald-500">{cell(summary.personnelTotal)}</td>
             </tr>
           </tbody>
         </table>
@@ -136,12 +143,12 @@ const FYSummaryTable = ({ summary, loading }) => {
   if (loading) return <Skeleton className="h-64 rounded-2xl" />;
   if (!summary || !Array.isArray(summary.papComposition)) return null;
 
-  const totalPSBase = summary.ps;
+  const totalPSBase = summary.psTotal;
   const totalMOOE = summary.mooe;
   const totalCO = summary.co || 0;
 
   const cell = (val) =>
-    val > 0 ? <span className="font-mono">{formatPHP(val)}</span> : <span className="text-slate-300">—</span>;
+    val > 0 ? <span className="font-mono">₱{formatPHP(val)}</span> : <span className="text-slate-300">—</span>;
 
   return (
     <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden flex flex-col h-full shadow-sm">
@@ -176,7 +183,7 @@ const FYSummaryTable = ({ summary, loading }) => {
                   <td className="px-5 py-3.5 text-[10px] font-bold text-slate-600 dark:text-slate-300 uppercase leading-tight">{row.pap_des}</td>
                   <td className="px-5 py-3.5 text-right text-[11px] text-slate-500 dark:text-slate-400">{cell(psVal)}</td>
                   <td className="px-5 py-3.5 text-right text-[11px] text-slate-500 dark:text-slate-400">{cell(mooeVal)}</td>
-                  <td className="px-5 py-3.5 text-right text-[11px] text-slate-300">{cell(coVal)}</td>
+                  <td className="px-5 py-3.5 text-right text-[11px] text-slate-300">—</td>
                   <td className="px-5 py-3.5 text-right text-[11px] font-bold text-slate-700 dark:text-slate-200 bg-slate-50/30 dark:bg-slate-900/20">{cell(rowGT)}</td>
                 </tr>
               );
@@ -190,10 +197,10 @@ const FYSummaryTable = ({ summary, loading }) => {
             </tr>
             <tr className="border-b border-slate-50 dark:border-slate-700 bg-slate-50/20">
               <td className="px-5 py-4 text-[10px] font-bold text-slate-500 dark:text-slate-400 italic uppercase">RLIP CONTRIBUTION</td>
-              <td className="px-5 py-4 text-right text-[11px] text-slate-500 dark:text-slate-400 italic">{cell(summary.rlip)}</td>
+              <td className="px-5 py-4 text-right text-[11px] text-slate-500 dark:text-slate-400 italic">{cell(summary.rlipTotal)}</td>
               <td className="px-5 py-4 text-right text-[11px] text-slate-300 italic">—</td>
               <td className="px-5 py-4 text-right text-[11px] text-slate-300 italic">—</td>
-              <td className="px-5 py-4 text-right text-[11px] font-bold text-slate-500 dark:text-slate-400 italic bg-slate-50/20 dark:bg-slate-900/20">{cell(summary.rlip)}</td>
+              <td className="px-5 py-4 text-right text-[11px] font-bold text-slate-500 dark:text-slate-400 italic bg-slate-50/20 dark:bg-slate-900/20">{cell(summary.rlipTotal)}</td>
             </tr>
             <tr className="bg-emerald-50/40 dark:bg-emerald-900/10">
               <td className="px-5 py-4 text-[11px] font-black text-emerald-700 dark:text-emerald-400 uppercase">GRAND TOTAL</td>
@@ -402,14 +409,15 @@ const DashboardOverview = () => {
 
   useEffect(() => {
     if (executiveSummary) {
-      console.log("typeSummary", executiveSummary.typeSummary);
-      console.log("papComposition", executiveSummary.papComposition);
+      console.log("psRows", executiveSummary.psRows);
+      console.log("rlipRows", executiveSummary.rlipRows);
     }
   }, [executiveSummary]);
 
   const summary = executiveSummary || {
     totalBudget: 0, totalObligated: 0, remainingBudget: 0, utilizationRate: 0,
-    ps: 0, rlip: 0, personnelTotal: 0, mooe: 0, co: 0,
+    psRows: [], psTotal: 0, rlipRows: [], rlipTotal: 0,
+    personnelTotal: 0, mooe: 0, co: 0,
     typeSummary: {},
     papComposition: [],
     workflow: {}, health: { status: 'Healthy', score: 0 }
@@ -459,14 +467,14 @@ const DashboardOverview = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           title="Total Budget"
-          value={`₱${formatPHP(summary.totalBudget)}`}
+          value={`₱${formatPHP(summary.totalBudget || summary.grandTotal)}`}
           subValue="Consolidated Allotment"
           icon={Wallet}
           loading={loading}
         />
         <StatCard
           title="Total Obligated"
-          value={`₱${formatPHP(summary.totalObligated)}`}
+          value={`₱${formatPHP(summary.totalObligated || (summary.obligated && summary.obligated.total))}`}
           subValue="Processed Obligations"
           icon={ArrowDownToLine}
           variant="emerald"
@@ -474,7 +482,7 @@ const DashboardOverview = () => {
         />
         <StatCard
           title="Remaining Budget"
-          value={`₱${formatPHP(summary.remainingBudget)}`}
+          value={`₱${formatPHP(summary.remainingBudget || (summary.balance && summary.balance.total))}`}
           subValue="Available for Procurement"
           icon={Clock}
           variant="amber"
@@ -544,7 +552,7 @@ const DashboardOverview = () => {
         </div>
       </div>
 
-      {/* SECTION 3: DYNAMIC PAP DESCRIPTION TABLES */}
+      {/* SECTION 3: DYNAMIC PAP DESCRIPTION TABLES (RESTORED SEPARATE SECTIONS) */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <PSTableSummary summary={summary} loading={loading} />
         <FYSummaryTable summary={summary} loading={loading} />

@@ -6,122 +6,119 @@ import { getKeyFromLabel } from "../../utils/helper";
 const PSTable = ({ data, tableLabel = "Retrieved PS Records", fundSource = "" }) => {
   const [searchTerm, setSearchTerm] = useState("");
 
-  const isRLIPSource = fundSource.includes("RLIP");
-
-  // Check both pap_type and pap_des for RLIP keyword
-  const getSection = (row) => {
-    const type = (row.pap_type || "").toUpperCase();
-    const des = (row.pap_des || "").toUpperCase();
-    const isRLIP = type.includes("RLIP") || des.includes("RLIP") || type.includes("RETIREMENT AND LIFE INSURANCE");
-    return isRLIP ? "RLIP" : "PS";
-  };
-
   const processedRows = useMemo(() => {
-    // 0. Filter by Fund Source first: only rows belonging to the selected source
-    let validItems = data.filter(item => {
-        // Items must have a name/expense item and shouldn't be existing headers
-        const isItem = (item.expense_items || item.name) && !item.isHeader && !item.isSubHeader;
-        if (!isItem) return false;
-
-        const section = getSection(item);
-        return isRLIPSource ? section === "RLIP" : section === "PS";
-    });
+    let items = data;
 
     if (searchTerm) {
       const s = searchTerm.toLowerCase();
-      validItems = validItems.filter(r =>
+      items = items.filter(r =>
         (r.expense_items || "").toLowerCase().includes(s) ||
         (r.pap_des || "").toLowerCase().includes(s) ||
-        (r.pap_type || "").toLowerCase().includes(s)
+        (r.pap_type || "").toLowerCase().includes(s) ||
+        (r.name || "").toLowerCase().includes(s)
       );
     }
 
     const rows = [];
-    const grouped = {};
 
-    // 1. Group by pap_type (Major) -> then by pap_des_code (Sub)
-    validItems.forEach(item => {
-      const type = item.pap_type || "GENERAL ADMINISTRATION AND SUPPORT";
-      const code = item.pap_des_code || "";
-      const des = item.pap_des || "";
+    // Grouping logic
+    const psItems = items.filter(i => i.cost_category === "PS" && !i.isSectionHeader);
+    const rlipItems = items.filter(i => i.cost_category === "RLIP" && !i.isSectionHeader);
+    const rlipHeader = items.find(i => i.cost_category === "RLIP" && i.isSectionHeader);
 
-      if (!grouped[type]) grouped[type] = {};
-
-      // Use code as the key for the sub-group
-      const groupKey = code || des || "Miscellaneous";
-
-      if (!grouped[type][groupKey]) {
-        grouped[type][groupKey] = {
-          code: code,
-          description: des,
-          items: []
-        };
-      }
-      grouped[type][groupKey].items.push(item);
+    // 1. Process PS Items with Hierarchies
+    const groupedPS = {};
+    psItems.forEach(item => {
+        if (item.is_header) return;
+        const type = item.pap_type || "GENERAL ADMINISTRATION AND SUPPORT";
+        const code = item.pap_des_code || "";
+        const des = item.pap_des || "";
+        if (!groupedPS[type]) groupedPS[type] = {};
+        const groupKey = code || des || "Miscellaneous";
+        if (!groupedPS[type][groupKey]) {
+            groupedPS[type][groupKey] = { code, description: des, items: [] };
+        }
+        groupedPS[type][groupKey].items.push(item);
     });
 
     let totalPS = 0;
-    let totalRLIP = 0;
+    Object.keys(groupedPS).forEach(type => {
+        rows.push({ name: type, isHeader: true });
+        let typeSubtotal = 0;
 
-    // 2. Build rows with subtotals
-    Object.keys(grouped).forEach(papType => {
-      rows.push({ name: papType, isHeader: true });
+        Object.keys(groupedPS[type]).forEach(code => {
+            const group = groupedPS[type][code];
+            rows.push({ name: `${code} ${group.description}`, isSubHeader: true });
 
-      let categorySubtotal = 0;
-      // Use the first item in the group to determine the section (PS or RLIP)
-      const firstItem = Object.values(grouped[papType])[0].items[0];
-      const section = getSection(firstItem);
+            let codeSubtotal = 0;
+            group.items.forEach(item => {
+                const amt = parseFloat(item.total_amount || item.amount || 0);
+                codeSubtotal += amt;
+                rows.push({
+                    name: item.rawName || item.name || item.expense_items,
+                    total_amount: amt,
+                    isItem: true
+                });
+            });
 
-      Object.keys(grouped[papType]).forEach(code => {
-        const group = grouped[papType][code];
-        rows.push({ name: `${code} ${group.description}`, isSubHeader: true });
-
-        let codeSubtotal = 0;
-        group.items.forEach(item => {
-          const amt = parseFloat(item.total_amount || item.total || 0);
-          codeSubtotal += amt;
-          rows.push({
-            ...item,
-            name: item.expense_items,
-            total_amount: amt,
-            isItem: true
-          });
+            typeSubtotal += codeSubtotal;
+            rows.push({
+                name: `Sub-total, ${code}`,
+                total_amount: codeSubtotal,
+                isCodeSubtotal: true
+            });
         });
 
-        categorySubtotal += codeSubtotal;
-        // Sub-total row per code
+        const typeKey = getKeyFromLabel(type);
         rows.push({
-          name: `Sub-total, ${code}`,
-          total_amount: codeSubtotal,
-          isCodeSubtotal: true
+            name: `Sub-total, ${typeKey}`,
+            total_amount: typeSubtotal,
+            isCategorySubtotal: true
         });
-      });
-
-      // Sub-total row per category (GAS, OPERATIONS, etc)
-      const label = getKeyFromLabel(papType);
-      rows.push({
-        name: `Sub-Total, ${label}`,
-        total_amount: categorySubtotal,
-        isCategorySubtotal: true
-      });
-
-      if (section === "PS") totalPS += categorySubtotal;
-      else totalRLIP += categorySubtotal;
+        totalPS += typeSubtotal;
     });
 
-    // 3. Section Totals
-    if (isRLIPSource) {
-        if (totalRLIP > 0) {
-            rows.push({ name: "Total, RLIP", total_amount: totalRLIP, isSectionTotal: true });
-        }
-    } else {
-        if (totalPS > 0) {
-            rows.push({ name: "Total, PS", total_amount: totalPS, isSectionTotal: true });
-        }
+    // 2. Total, PS Row (Yellow)
+    if (totalPS > 0) {
+        rows.push({ name: "Total, PS", total_amount: totalPS, isSectionTotal: true });
+    }
+
+    // Divider
+    rows.push({ isDivider: true });
+
+    // 3. RLIP Section
+    if (rlipHeader) {
+        rows.push({ name: rlipHeader.name, isRlipHeader: true });
+    } else if (rlipItems.length > 0) {
+        rows.push({ name: "Retirement and Life Insurance Premiums (RLIP)", isRlipHeader: true });
+    }
+
+    let totalRLIP = 0;
+    rlipItems.forEach(item => {
+        const amt = parseFloat(item.total_amount || item.amount || 0);
+        totalRLIP += amt;
+        rows.push({
+            name: item.rawName || item.name,
+            total_amount: amt,
+            isItem: true,
+            isRlipItem: true
+        });
+    });
+
+    if (totalRLIP > 0) {
+        rows.push({ name: "Total, RLIP", total_amount: totalRLIP, isSectionTotal: true });
+    }
+
+    // Divider
+    rows.push({ isDivider: true });
+
+    // 4. Grand Total Row (Green)
+    if (totalPS > 0 || totalRLIP > 0) {
+        rows.push({ name: "Grand Total, PS + RLIP", total_amount: totalPS + totalRLIP, isGrandTotal: true });
     }
 
     return rows;
-  }, [data, searchTerm, isRLIPSource]);
+  }, [data, searchTerm]);
 
   return (
     <div className="flex flex-col h-full w-full">
@@ -138,10 +135,10 @@ const PSTable = ({ data, tableLabel = "Retrieved PS Records", fundSource = "" })
         <table className="min-w-full table-fixed bg-white border-collapse">
           <thead className="bg-green-600 text-white sticky top-0 z-30">
             <tr>
-              <th className="px-2 py-2 text-xs font-semibold text-center border-r border-green-500 w-[70%]">
+              <th className="px-2 py-2 text-xs font-semibold text-center border-r border-green-500 w-[75%]">
                 PARTICULARS
               </th>
-              <th className="px-2 py-2 text-xs font-semibold text-center w-[30%]">
+              <th className="px-2 py-2 text-xs font-semibold text-center w-[25%]">
                 TOTAL
               </th>
             </tr>
@@ -157,71 +154,76 @@ const PSTable = ({ data, tableLabel = "Retrieved PS Records", fundSource = "" })
                 const name = row.name || "";
                 const amount = row.total_amount || 0;
 
-                // Major Header (GAS / OPERATIONS)
+                if (row.isDivider) {
+                    return <tr key={idx} className="h-4 bg-white"><td colSpan="2"></td></tr>;
+                }
+
                 if (row.isHeader) {
-                  return (
-                    <tr key={idx} className="bg-gray-600 text-white font-bold sticky z-20">
-                      <td colSpan="2" className="px-3 py-1 text-[11px] uppercase">{name}</td>
-                    </tr>
-                  );
-                }
-
-                // Sub Header (Code + Description)
-                if (row.isSubHeader) {
-                  return (
-                    <tr key={idx} className="bg-gray-400 text-white font-medium sticky z-10 border-b border-gray-500">
-                      <td colSpan="2" className="px-3 py-1 text-[11px] underline font-bold">{name}</td>
-                    </tr>
-                  );
-                }
-
-                // Sub-total per code
-                if (row.isCodeSubtotal) {
                     return (
-                      <tr key={idx} className="bg-white border-b-2 border-black font-bold">
-                        <td className="px-10 py-1 text-[11px] text-left">{name}</td>
-                        <td className="px-4 py-1 text-[11px] text-right">{formatAmount(amount)}</td>
+                      <tr key={idx} className="bg-gray-100 border-b border-gray-300">
+                        <td colSpan="2" className="px-3 py-1 text-[11px] font-black text-gray-700 uppercase">{name}</td>
                       </tr>
                     );
                 }
 
-                // Sub-total per category (GAS/OPERATIONS) - Blue Text Style
+                if (row.isSubHeader) {
+                    return (
+                      <tr key={idx} className="bg-white border-b border-gray-200">
+                        <td colSpan="2" className="px-3 py-1 text-[11px] font-bold text-gray-600 pl-6 underline">{name}</td>
+                      </tr>
+                    );
+                }
+
+                if (row.isCodeSubtotal) {
+                    return (
+                      <tr key={idx} className="bg-white border-b border-black font-bold">
+                        <td className="px-10 py-1 text-[11px] text-left">{name}</td>
+                        <td className="px-4 py-1 text-[11px] text-right border-t border-black">{formatAmount(amount)}</td>
+                      </tr>
+                    );
+                }
+
                 if (row.isCategorySubtotal) {
-                  return (
-                    <tr key={idx} className="bg-white border-b border-gray-200 font-bold text-blue-700">
-                      <td className="px-3 py-1 text-[11px] uppercase">{name}</td>
-                      <td className="px-4 py-1 text-[11px] text-right border-t border-black">{formatAmount(amount)}</td>
-                    </tr>
-                  );
+                    return (
+                      <tr key={idx} className="bg-white font-bold text-blue-700">
+                        <td className="px-3 py-1 text-[11px] uppercase">{name}</td>
+                        <td className="px-4 py-1 text-[11px] text-right border-t border-black">{formatAmount(amount)}</td>
+                      </tr>
+                    );
                 }
 
-                // Section Total (Total PS / Total RLIP) - Yellow BG
                 if (row.isSectionTotal) {
-                  return (
-                    <tr key={idx} className="bg-yellow-300 border-y-2 border-black font-extrabold">
-                      <td className="px-3 py-1 text-[12px]">{name}</td>
-                      <td className="px-4 py-1 text-[12px] text-right">{formatAmount(amount)}</td>
-                    </tr>
-                  );
+                    return (
+                      <tr key={idx} className="bg-[#ffff00] border-y-2 border-black font-bold">
+                        <td className="px-3 py-1.5 text-[12px]">{name}</td>
+                        <td className="px-4 py-1.5 text-[12px] text-right">{formatAmount(amount)}</td>
+                      </tr>
+                    );
                 }
 
-                // Grand Total - Light Green BG
+                if (row.isRlipHeader) {
+                    return (
+                        <tr key={idx} className="bg-white">
+                          <td colSpan="2" className="px-3 py-2 text-[11px] font-bold text-blue-800 italic">{name}</td>
+                        </tr>
+                    );
+                }
+
                 if (row.isGrandTotal) {
-                  return (
-                    <tr key={idx} className="bg-[#d1e7dd] border-y-2 border-black font-extrabold text-blue-900">
-                      <td className="px-3 py-2 text-[13px]">{name}</td>
-                      <td className="px-4 py-2 text-[13px] text-right border-double border-t-4 border-black">{formatAmount(amount)}</td>
-                    </tr>
-                  );
+                    return (
+                      <tr key={idx} className="bg-[#d9ead3] border-y-2 border-blue-800 font-bold text-blue-900">
+                        <td className="px-3 py-2 text-[13px]">{name}</td>
+                        <td className="px-4 py-2 text-[13px] text-right border-double border-t-2 border-blue-900">{formatAmount(amount)}</td>
+                      </tr>
+                    );
                 }
 
-                // Normal Item
                 return (
-                  <tr key={idx} className="hover:bg-green-50 border-b border-gray-100">
-                    <td className="px-3 py-1 text-[11px] border-r border-gray-100 text-gray-700 pl-8">
+                  <tr key={idx} className="hover:bg-gray-50 border-b border-gray-100">
+                    <td className={`px-3 py-1 text-[11px] text-gray-700 ${row.isRlipItem ? 'pl-8 italic' : 'pl-12'}`}>
                       {name}
                     </td>
-                    <td className="px-4 py-1 text-[11px] text-right text-gray-800">
+                    <td className="px-4 py-1 text-[11px] text-right text-gray-800 font-mono">
                       {amount > 0 ? formatAmount(amount) : "-"}
                     </td>
                   </tr>

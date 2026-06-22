@@ -41,8 +41,8 @@ class FiscalYearContext {
   static async resolvePlanId(input) {
     if (!input) return await this.getActivePlanId();
 
-    // If input is already a full plan_id (e.g. PLAN-2026-...), return it
-    if (String(input).startsWith('PLAN-')) return input;
+    // If input is already a full plan_id (e.g. MOOE-2026-..., PS-2026-..., or old PLAN-...)
+    if (String(input).includes('-20')) return input;
 
     // If input is a year (e.g. 2024 or "2024"), find the latest plan for that year
     const plans = await FiscalYearRepository.getByYear(input);
