@@ -95,7 +95,7 @@ const views = [
 
     `CREATE OR REPLACE VIEW vw_pr_details AS
     SELECT
-        pr.id, pr.prno, pr.purpose, pr.workflow_status, pr.remarks, pr.amount AS pr_amount, pr.created_at, YEAR(pr.created_at) AS fiscal_year,
+        pr.id, pr.mooe_id, pr.prno, pr.purpose, pr.workflow_status, pr.remarks, pr.amount AS pr_amount, pr.created_at, YEAR(pr.created_at) AS fiscal_year,
         m.office, m.pap_type, m.pap_des, m.ref_main_name AS activity, m.performance_indicator, m.expense_items, m.expense_items_sub,
         COALESCE(SUM(CASE WHEN ob.is_deleted = 0 THEN ob.amount ELSE 0 END), 0) AS obligated_amount,
         (pr.amount - COALESCE(SUM(CASE WHEN ob.is_deleted = 0 THEN ob.amount ELSE 0 END), 0)) AS remaining_balance,
@@ -105,7 +105,7 @@ const views = [
             ELSE 'FULLY_OBLIGATED'
         END) AS budget_status
     FROM pr_so pr LEFT JOIN mooe m ON pr.mooe_id = m.id LEFT JOIN obligation ob ON pr.id = ob.pr_id WHERE pr.is_deleted = 0
-    GROUP BY pr.id, pr.prno, pr.purpose, pr.workflow_status, pr.remarks, pr.amount, pr.created_at, m.id;`,
+    GROUP BY pr.id, pr.mooe_id, pr.prno, pr.purpose, pr.workflow_status, pr.remarks, pr.amount, pr.created_at, m.id;`,
 
     `CREATE OR REPLACE VIEW vw_obligation_details AS
     SELECT
@@ -117,14 +117,16 @@ const views = [
 
     `CREATE OR REPLACE VIEW vw_mooe_excel_full_report AS
     SELECT
+        m.id,
         m.plan_id,
-        YEAR(m.created_at)     AS plan_year,
+        YEAR(m.created_at) AS plan_year,
         m.pap_type_code,
         m.pap_type,
         m.pap_des_code,
         m.pap_des,
-        m.ref_main_name        AS activity,
-        m.ref_middle_name      AS performance_indicator,
+        m.office,
+        m.name AS activity,
+        m.performance_indicator,
         m.expense_items        AS object_group,
         m.expense_items_sub    AS sub_object,
         COALESCE(NULLIF(m.sub_total_name, ''), '-') AS row_label,

@@ -1,18 +1,9 @@
 import { mooeAPI, psAPI } from './api';
 import DataNormalizationEngine from '../utils/DataNormalizationEngine';
 
-/**
- * TransactionFilterEngine
- * A centralized reusable service for cascading filters and allocation logic.
- * Handles dynamic data source resolution (PS vs MOOE) while keeping datasets independent.
- */
+
 class TransactionFilterEngine {
 
-  /**
-   * Resolves the correct API based on allotment class.
-   * MOOE & CO -> mooe table
-   * PS -> ps table
-   */
   static getAPI(allotmentClass) {
     if (allotmentClass === 'PS') return psAPI;
     return mooeAPI;
@@ -22,7 +13,6 @@ class TransactionFilterEngine {
     try {
       const api = this.getAPI(allotmentClass);
       const response = await api.getDistinctValues('pap_type');
-      // response is already the JSON body { success: true, data: [...] }
       return DataNormalizationEngine.smartDeduplicate(response.data || []);
     } catch (error) {
       console.error(`Error fetching PAP Types for ${allotmentClass}:`, error);
@@ -33,6 +23,12 @@ class TransactionFilterEngine {
   static async getPapDescriptions(allotmentClass, papType) {
     try {
       const api = this.getAPI(allotmentClass);
+      // For MOOE, use distinct values with code mapping. For PS, keep original behavior.
+      if (allotmentClass === 'MOOE') {
+        const response = await api.getDistinctValues('pap_des', { pap_type: papType });
+        return response.data || [];
+      }
+
       const response = await api.getAll({ pap_type: papType });
       const records = response.data || [];
       const descriptions = records.map(r => r.pap_des).filter(Boolean);
@@ -47,6 +43,12 @@ class TransactionFilterEngine {
     try {
       if (allotmentClass === 'PS') return [];
       const api = this.getAPI(allotmentClass);
+
+      if (allotmentClass === 'MOOE') {
+        const response = await api.getDistinctValues('office', { pap_type: papType, pap_des: papDes });
+        return response.data || [];
+      }
+
       const response = await api.getAll({ pap_type: papType, pap_des: papDes });
       const records = response.data || [];
       const offices = records.map(r => r.office).filter(Boolean);

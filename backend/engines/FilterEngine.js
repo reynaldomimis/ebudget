@@ -3,66 +3,88 @@ const DataNormalizationEngine = require("./DataNormalizationEngine");
 
 class FilterEngine {
   static async getDistinctValues(table, field, filters = {}) {
-    const allowedTables = ["mooe", "ps", "pr_so", "obligation"];
-    const allowedFields = ["pap_type", "pap_des", "office", "name", "expense_items", "expense_items_sub", "ref_main_name"];
+    const allowedTables = ["mooe", "ps", "pr_so", "obligation", "vw_mooe_excel_full_report"];
+    const allowedFields = ["pap_type", "pap_des", "office", "activity", "object_group", "sub_object", "ref_main_name", "name", "expense_items", "expense_items_sub"];
 
     if (!allowedTables.includes(table)) {
       throw new Error(`Invalid table: ${table}`);
     }
-    if (!allowedFields.includes(field)) {
-        throw new Error(`Invalid field: ${field}`);
+
+    const fieldMap = {
+        'name': 'activity',
+        'expense_items': 'object_group',
+        'expense_items_sub': 'sub_object'
+    };
+
+    const targetField = fieldMap[field] || field;
+
+    let targetTable = table;
+    if (table === 'mooe') targetTable = 'vw_mooe_excel_full_report';
+
+    // refactor: if field is pap_type or pap_des, we want the code and label combined
+    let selectClause = `DISTINCT ${targetField}`;
+    if (targetTable === "vw_mooe_excel_full_report") {
+        if (targetField === 'pap_type') selectClause = `DISTINCT CONCAT(pap_type_code, '|', pap_type) as result`;
+        else if (targetField === 'pap_des') selectClause = `DISTINCT CONCAT(pap_des_code, '|', pap_des) as result`;
+        else selectClause = `DISTINCT ${targetField} as result`;
+    } else {
+        selectClause = `DISTINCT ${targetField} as result`;
     }
 
-    let query = `SELECT DISTINCT ${field} FROM ${table} WHERE ${field} IS NOT NULL AND ${field} != '' AND is_deleted = 0`;
+    let query = `SELECT ${selectClause} FROM ${targetTable} WHERE 1=1`;
+
+    if (targetTable !== "vw_mooe_excel_full_report") {
+        query += " AND is_deleted = 0";
+    }
+
     const values = [];
 
-    if (table === "mooe") {
-        query += " AND is_subtotal = 0";
-
-        if (field === 'pap_type' || field === 'pap_des' || field === 'office' || field === 'name') {
-            query += ` AND (
-                (expense_items IS NOT NULL AND TRIM(expense_items) != '')
-                OR
-                (expense_items_sub IS NOT NULL AND TRIM(expense_items_sub) != '')
-            )`;
-        }
-    }
-
-    // PS does not have is_subtotal column, we rely on expense_items check
-    if (table === "ps") {
-        query += " AND expense_items IS NOT NULL AND expense_items != ''";
+    if (targetTable === "vw_mooe_excel_full_report") {
+        query += " AND row_type = 'DETAIL' AND total_amount > 0";
     }
 
     Object.keys(filters).forEach(key => {
-        if (filters[key]) {
-            query += ` AND ${key} = ?`;
-            values.push(filters[key]);
+        let targetKey = fieldMap[key] || key;
+        let filterValue = filters[key];
+
+        if (targetTable === "vw_mooe_excel_full_report") {
+            if (key === 'pap_type') targetKey = 'pap_type_code';
+            if (key === 'pap_des') targetKey = 'pap_des_code';
+
+            // If the value passed is a combined "code|label", extract only the code
+            if (String(filterValue).includes('|')) {
+                filterValue = filterValue.split('|')[0];
+            }
+        }
+
+        if (filterValue) {
+            query += ` AND ${targetKey} = ?`;
+            values.push(filterValue);
         }
     });
 
-    if (table === "mooe") {
-        query += ` GROUP BY ${field} ORDER BY MIN(sort_order) ASC`;
+    if (targetTable === "vw_mooe_excel_full_report") {
+        query += ` GROUP BY result ORDER BY MIN(report_order) ASC`;
     } else {
-        query += ` ORDER BY ${field} ASC`;
+        query += ` ORDER BY result ASC`;
     }
 
     const [rows] = await pool.execute(query, values);
-    return rows.map(r => DataNormalizationEngine.normalizeLabel(r[field]));
+    return rows.map(r => r.result);
   }
 
   static async getHierarchicalFilters(plan_id) {
-    // STRICT SQL FILTER: Exclude rows that are purely structural (no expense category or sub-category)
     let mooeQuery = `
-      SELECT id, pap_type, pap_des, office, name, expense_items, expense_items_sub
-      FROM mooe
-      WHERE is_subtotal = 0
-        AND is_deleted = 0
-        AND name IS NOT NULL AND TRIM(name) != ''
-        AND (
-          (expense_items IS NOT NULL AND TRIM(expense_items) != '')
-          OR
-          (expense_items_sub IS NOT NULL AND TRIM(expense_items_sub) != '')
-        )
+      SELECT
+        id,
+        pap_type_code, pap_type,
+        pap_des_code, pap_des,
+        office, activity as name,
+        object_group as expense_items,
+        sub_object as expense_items_sub
+      FROM vw_mooe_excel_full_report
+      WHERE row_type = 'DETAIL'
+        AND total_amount > 0
     `;
     const mooeValues = [];
 
@@ -71,65 +93,48 @@ class FilterEngine {
         mooeValues.push(plan_id);
     }
 
-    mooeQuery += " ORDER BY sort_order ASC";
+    mooeQuery += " ORDER BY report_order ASC";
 
     const [mooeRows] = await pool.execute(mooeQuery, mooeValues);
 
     const hierarchy = {};
-    let lastExpenseItem = "";
-    let lastRecordKey = "";
 
     mooeRows.forEach(row => {
-      // Normalize labels for consistent matching
-      const pap_type = DataNormalizationEngine.normalizeLabel(row.pap_type);
-      const pap_des = DataNormalizationEngine.normalizeLabel(row.pap_des);
-      const office = DataNormalizationEngine.normalizeLabel(row.office);
-      const name = DataNormalizationEngine.normalizeLabel(row.name);
-      let expense_items = DataNormalizationEngine.normalizeLabel(row.expense_items);
-      const expense_items_sub = DataNormalizationEngine.normalizeLabel(row.expense_items_sub);
+      // Create code-aware keys to prevent description-based mismatch
+      const typeKey = `${row.pap_type_code}|${row.pap_type}`;
+      const desKey = `${row.pap_des_code}|${row.pap_des}`;
+      const office = row.office || 'N/A';
+      const name = row.name || 'General';
+      const expense_items = row.expense_items || 'General';
+      const expense_items_sub = row.expense_items_sub;
 
-      const recordKey = `${pap_type}|${pap_des}|${office}|${name}`;
+      if (!hierarchy[typeKey]) hierarchy[typeKey] = {};
+      if (!hierarchy[typeKey][desKey]) hierarchy[typeKey][desKey] = {};
+      if (!hierarchy[typeKey][desKey][office]) hierarchy[typeKey][desKey][office] = {};
+      if (!hierarchy[typeKey][desKey][office][name]) hierarchy[typeKey][desKey][office][name] = {};
 
-      // Carry over expense_items category if blank (inherits from previous row in same group)
-      if ((!expense_items || expense_items.trim() === "") && recordKey === lastRecordKey) {
-          expense_items = lastExpenseItem;
+      if (!hierarchy[typeKey][desKey][office][name][expense_items]) {
+          hierarchy[typeKey][desKey][office][name][expense_items] = [];
       }
 
-      // FINAL VALIDATION: Discard if we still have no selectable expense item
-      if (!expense_items || expense_items.trim() === "") {
-          return;
-      }
-
-      // Initialize hierarchy nodes only for validated actionable items
-      if (!hierarchy[pap_type]) hierarchy[pap_type] = {};
-      if (!hierarchy[pap_type][pap_des]) hierarchy[pap_type][pap_des] = {};
-      if (!hierarchy[pap_type][pap_des][office]) hierarchy[pap_type][pap_des][office] = {};
-      if (!hierarchy[pap_type][pap_des][office][name]) hierarchy[pap_type][pap_des][office][name] = {};
-
-      if (!hierarchy[pap_type][pap_des][office][name][expense_items]) {
-          hierarchy[pap_type][pap_des][office][name][expense_items] = [];
-      }
-
-      const subItemLabel = (expense_items_sub && expense_items_sub.trim() !== "")
+      const label = (expense_items_sub && expense_items_sub.trim() !== "")
           ? expense_items_sub
           : expense_items;
 
-      hierarchy[pap_type][pap_des][office][name][expense_items].push({
+      hierarchy[typeKey][desKey][office][name][expense_items].push({
           id: row.id,
-          label: subItemLabel
+          label: label
       });
-
-      // Update tracking pointers
-      lastExpenseItem = expense_items;
-      lastRecordKey = recordKey;
     });
 
-    // PS Hierarchy (keep it simple for now)
-    const psPapTypes = await this.getDistinctValues("ps", "pap_type");
+    // PS Hierarchy remains distinct
+    const psRows = await pool.query("SELECT DISTINCT pap_type, pap_des FROM ps WHERE is_deleted = 0");
     const psHierarchy = {};
-    for (const type of psPapTypes) {
-        psHierarchy[type] = await this.getDistinctValues("ps", "pap_des", { pap_type: type });
-    }
+    psRows[0].forEach(r => {
+        const type = r.pap_type;
+        if (!psHierarchy[type]) psHierarchy[type] = [];
+        psHierarchy[type].push(r.pap_des);
+    });
 
     return {
       mooe: hierarchy,

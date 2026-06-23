@@ -26,7 +26,7 @@ class ObligationRepository {
              vb.pr_amount, vb.obligated_amount as total_obligated, vb.remaining_balance, vb.budget_status as pr_status
       FROM obligation o
       LEFT JOIN mooe a ON o.mooe_id = a.id
-      LEFT JOIN vw_pr_balances vb ON o.pr_id = vb.id
+      LEFT JOIN vw_pr_details vb ON o.pr_id = vb.id
       WHERE o.is_deleted = 0
       ORDER BY o.transaction_date DESC, o.created_at DESC
     `;

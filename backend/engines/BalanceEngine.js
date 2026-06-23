@@ -31,17 +31,22 @@ class BalanceEngine {
   }
 
   static async getAvailableAllocation(mooeId, connection) {
-    const mooeItem = await MOOERepository.getById(mooeId, connection);
-    if (!mooeItem) return 0;
+    const { pool } = require("../config/database");
+    const [viewRows] = await (connection || pool).query(
+      "SELECT total_amount FROM vw_mooe_excel_full_report WHERE id = ?",
+      [mooeId]
+    );
+
+    if (viewRows.length === 0) return 0;
+    const totalAmount = Number(viewRows[0].total_amount || 0);
 
     const prs = await PRRepository.getByMOOEId(mooeId, connection);
-    // Use pr_amount from view
     const totalPRAmount = prs.reduce((sum, p) => sum + Number(p.pr_amount), 0);
 
     const obligations = await ObligationRepository.getByMOOEId(mooeId, connection);
     const directObligations = obligations.filter(o => !o.prno).reduce((sum, o) => sum + Number(o.amount), 0);
 
-    return Number(mooeItem.totalFq) - totalPRAmount - directObligations;
+    return totalAmount - totalPRAmount - directObligations;
   }
 
   static async getPAPBalance(planId, papDes, connection) {

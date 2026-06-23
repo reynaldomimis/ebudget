@@ -44,7 +44,8 @@ const BudgetFilters = ({
   // Cascade: PAP Type -> PAP Description
   useEffect(() => {
     if (selection.papType) {
-      TransactionFilterEngine.getPapDescriptions(allotmentClass, selection.papType).then(setPapDescriptions);
+      const typeCode = selection.papType.split('|')[0];
+      TransactionFilterEngine.getPapDescriptions(allotmentClass, typeCode).then(setPapDescriptions);
     } else {
       setPapDescriptions([]);
     }
@@ -53,19 +54,20 @@ const BudgetFilters = ({
   // Cascade: PAP Description -> Office
   useEffect(() => {
     if (selection.papDes && allotmentClass !== 'PS') {
-      TransactionFilterEngine.getOffices(allotmentClass, selection.papType, selection.papDes).then(setOffices);
+      const typeCode = selection.papType.split('|')[0];
+      const desCode = selection.papDes.split('|')[0];
+      TransactionFilterEngine.getOffices(allotmentClass, typeCode, desCode).then(setOffices);
     } else {
       setOffices([]);
     }
   }, [selection.papDes, selection.papType, allotmentClass]);
 
-
   useEffect(() => {
     setNames([]);
     if (selection.office && allotmentClass !== 'PS') {
         const filters = {
-            pap_type: selection.papType,
-            pap_des: selection.papDes,
+            pap_type_code: selection.papType.split('|')[0],
+            pap_des_code: selection.papDes.split('|')[0],
             office: selection.office
         };
         mooeAPI.getDistinctValues('name', filters).then(res => {
@@ -79,8 +81,8 @@ const BudgetFilters = ({
     setExpenseItems([]);
     if (selection.name && allotmentClass === 'MOOE') {
       const filters = {
-          pap_type: selection.papType,
-          pap_des: selection.papDes,
+          pap_type_code: selection.papType.split('|')[0],
+          pap_des_code: selection.papDes.split('|')[0],
           office: selection.office,
           name: selection.name
       };
@@ -99,8 +101,8 @@ const BudgetFilters = ({
     setExpenseSubItems([]);
     if (selection.expenseItem && allotmentClass === 'MOOE') {
       const filters = {
-          pap_type: selection.papType,
-          pap_des: selection.papDes,
+          pap_type_code: selection.papType.split('|')[0],
+          pap_des_code: selection.papDes.split('|')[0],
           office: selection.office,
           name: selection.name,
           expense_items: selection.expenseItem
@@ -122,8 +124,8 @@ const BudgetFilters = ({
 
     if (canResolve && allotmentClass === 'MOOE') {
         const filters = {
-            pap_type: selection.papType,
-            pap_des: selection.papDes,
+            pap_type_code: selection.papType.split('|')[0],
+            pap_des_code: selection.papDes.split('|')[0],
             office: selection.office,
             name: selection.name,
             expense_items: selection.expenseItem
@@ -219,14 +221,20 @@ const BudgetFilters = ({
       <FormField label="PAP Type">
         <Select value={selection.papType} onChange={(e) => updateSelection('papType', e.target.value)}>
           <option value="">Select PAP Type...</option>
-          {papTypes.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+          {papTypes.map(opt => {
+              const [code, label] = opt.includes('|') ? opt.split('|') : [opt, opt];
+              return <option key={opt} value={opt}>{code} - {label}</option>
+          })}
         </Select>
       </FormField>
 
       <FormField label="PAP Description">
         <Select value={selection.papDes} onChange={(e) => updateSelection('papDes', e.target.value)} disabled={!selection.papType}>
           <option value="">Select Description...</option>
-          {papDescriptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+          {papDescriptions.map(opt => {
+              const [code, label] = opt.includes('|') ? opt.split('|') : [opt, opt];
+              return <option key={opt} value={opt}>{code} - {label}</option>
+          })}
         </Select>
       </FormField>
 

@@ -46,7 +46,7 @@ class MOOERepository {
   }
 
   static async getByPlan(plan_id, filters = {}) {
-    let query = "SELECT * FROM mooe WHERE is_deleted = 0";
+    let query = "SELECT id, pap_type, pap_des, office, activity as name, object_group as expense_items, sub_object as expense_items_sub, total_amount as totalFq FROM vw_mooe_excel_full_report WHERE 1=1";
     const values = [];
 
     if (plan_id) {
@@ -54,15 +54,28 @@ class MOOERepository {
         values.push(plan_id);
     }
 
-    const filterableFields = ["id", "pap_type", "pap_des", "pap_des_code", "office", "name", "expense_items", "expense_items_sub"];
-    filterableFields.forEach(field => {
-        if (filters[field]) {
-            query += ` AND ${field} = ?`;
+    const filterMap = {
+        "id": "id",
+        "pap_type": "pap_type",
+        "pap_type_code": "pap_type_code",
+        "pap_des": "pap_des",
+        "pap_des_code": "pap_des_code",
+        "office": "office",
+        "name": "activity",
+        "expense_items": "object_group",
+        "expense_items_sub": "sub_object"
+    };
+
+    Object.keys(filters).forEach(field => {
+        const targetField = filterMap[field];
+        if (targetField && filters[field]) {
+            query += ` AND ${targetField} = ?`;
             values.push(filters[field]);
         }
     });
 
-    query += " ORDER BY report_order, created_at";
+    query += " AND row_type = 'DETAIL' AND total_amount > 0";
+    query += " ORDER BY report_order";
     const [rows] = await pool.execute(query, values);
     return rows;
   }

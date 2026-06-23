@@ -28,29 +28,29 @@ class PRRepository {
   }
 
   static async getAll() {
-    const query = "SELECT * FROM vw_pr_balances ORDER BY transaction_date DESC";
+    const query = "SELECT * FROM vw_pr_details ORDER BY created_at DESC";
     const [rows] = await pool.execute(query);
     return rows;
   }
 
   static async getById(id) {
-    const [rows] = await pool.execute("SELECT * FROM vw_pr_balances WHERE id = ?", [id]);
+    const [rows] = await pool.execute("SELECT * FROM vw_pr_details WHERE id = ?", [id]);
     return rows[0];
   }
 
   static async getByPRNo(prno, connection = pool) {
-    const [rows] = await connection.execute("SELECT * FROM vw_pr_balances WHERE prno = ?", [prno]);
+    const [rows] = await connection.execute("SELECT * FROM vw_pr_details WHERE prno = ?", [prno]);
     return rows[0];
   }
 
   static async getByMOOEId(mooeId) {
-    let query = `SELECT * FROM vw_pr_balances`;
+    let query = `SELECT * FROM vw_pr_details`;
     const values = [];
     if (mooeId) {
         query += " WHERE mooe_id = ?";
         values.push(mooeId);
     }
-    query += " ORDER BY transaction_date DESC";
+    query += " ORDER BY created_at DESC";
     const [rows] = await pool.execute(query, values);
     return rows;
   }
@@ -102,7 +102,7 @@ class PRRepository {
   }
 
   static async getWithBalances() {
-    const [rows] = await pool.execute("SELECT * FROM vw_pr_balances");
+    const [rows] = await pool.execute("SELECT * FROM vw_pr_details");
     return rows;
   }
 }
