@@ -200,10 +200,10 @@ const CreatePR = ({ onCancel }) => {
                   <tr className="bg-neutral-50/30 text-neutral-400 text-[10px] uppercase tracking-widest font-black border-b border-neutral-100">
                     <th className="px-6 py-3 w-12 text-center">#</th>
                     <th className="px-6 py-3">Description</th>
-                    <th className="px-6 py-3 w-24">Qty</th>
-                    <th className="px-6 py-3 w-24">Unit</th>
-                    <th className="px-6 py-3 w-32 text-right">Unit Cost</th>
-                    <th className="px-6 py-3 w-32 text-right">Total</th>
+                    <th className="px-6 py-3 w-32">Qty</th>
+                    <th className="px-6 py-3 w-32">Unit</th>
+                    <th className="px-6 py-3 w-44 text-right">Unit Cost</th>
+                    <th className="px-6 py-3 w-40 text-right">Total</th>
                     <th className="px-6 py-3 w-12"></th>
                   </tr>
                 </thead>
@@ -215,7 +215,7 @@ const CreatePR = ({ onCancel }) => {
                         <Input
                           type="text"
                           placeholder="Item name/specifications"
-                          className="!min-h-[38px] !rounded-lg border-transparent hover:border-neutral-200 bg-transparent focus:bg-white"
+                          className="!min-h-[38px] !rounded-lg border-slate-200 hover:border-slate-400 bg-slate-50 focus:bg-white focus:border-emerald-500 cursor-text transition-colors"
                           value={item.description}
                           onChange={(e) => updateItem(item.id, 'description', e.target.value)}
                         />
@@ -223,7 +223,7 @@ const CreatePR = ({ onCancel }) => {
                       <td className="px-6 py-4">
                         <Input
                           type="number"
-                          className="!min-h-[38px] !rounded-lg border-transparent hover:border-neutral-200 bg-transparent focus:bg-white text-center"
+                          className="!min-h-[38px] !rounded-lg border-slate-200 hover:border-slate-400 bg-slate-50 focus:bg-white focus:border-emerald-500 text-center font-bold cursor-text transition-colors"
                           value={item.quantity}
                           onChange={(e) => updateItem(item.id, 'quantity', e.target.value)}
                         />
@@ -232,17 +232,17 @@ const CreatePR = ({ onCancel }) => {
                         <Input
                           type="text"
                           placeholder="pcs"
-                          className="!min-h-[38px] !rounded-lg border-transparent hover:border-neutral-200 bg-transparent focus:bg-white text-center"
+                          className="!min-h-[38px] !rounded-lg border-slate-200 hover:border-slate-400 bg-slate-50 focus:bg-white focus:border-emerald-500 text-center cursor-text transition-colors"
                           value={item.unit}
                           onChange={(e) => updateItem(item.id, 'unit', e.target.value)}
                         />
                       </td>
                       <td className="px-6 py-4">
                         <div className="relative">
-                          <span className="absolute left-1 top-1/2 -translate-y-1/2 text-neutral-300 font-bold text-xs z-10">₱</span>
+                          <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500 font-bold text-xs z-10 pointer-events-none">₱</span>
                           <Input
                             type="number"
-                            className="!min-h-[38px] !rounded-lg border-transparent hover:border-neutral-200 bg-transparent focus:bg-white text-right pl-4 font-mono"
+                            className="!min-h-[38px] !rounded-lg border-slate-200 hover:border-slate-400 bg-slate-50 focus:bg-white focus:border-emerald-500 text-right pl-6 font-mono font-bold cursor-text transition-colors"
                             value={item.unitCost}
                             onChange={(e) => updateItem(item.id, 'unitCost', e.target.value)}
                           />

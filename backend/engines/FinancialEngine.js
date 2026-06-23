@@ -94,7 +94,9 @@ class FinancialEngine {
       grandTotal: totals.grandTotal,
       papComposition: papRows.map(r => ({
         pap_des: r.pap_description,
+        pap_code: r.pap_des_code,
         type: r.pap_type,
+        type_code: r.pap_type_code,
         ps: Number(r.ps || 0),
         rlip: Number(r.rlip || 0),
         mooe: Number(r.mooe || 0),

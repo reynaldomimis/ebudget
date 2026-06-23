@@ -13,6 +13,7 @@ import {
 import { prAPI } from "../../services/api";
 import { formatPHP } from "../../utils/formatters";
 import ToastService from "../../services/ToastService";
+import EmptyState from "../../components/common/EmptyState";
 
 const QueueItem = ({ row, onAction }) => {
   const insufficient = row.remaining_balance < row.pr_amount;
@@ -147,21 +148,23 @@ const ReviewQueue = () => {
             </span>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="relative">
-            <Search
-              size={14}
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-            />
-            <input
-              type="text"
-              placeholder="Search PR No or Purpose…"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-[13px] focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-400 transition-all w-56"
-            />
+        {items.length > 0 && (
+          <div className="flex items-center gap-2">
+            <div className="relative">
+              <Search
+                size={14}
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+              />
+              <input
+                type="text"
+                placeholder="Search PR No or Purpose…"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-[13px] focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-400 transition-all w-56"
+              />
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {loading ? (
@@ -171,13 +174,12 @@ const ReviewQueue = () => {
         </div>
       ) : (
         <div className="space-y-3">
-          {filtered.map((item) => (
-            <QueueItem key={item.id} row={item} onAction={handleAction} />
-          ))}
-          {filtered.length === 0 && (
-            <div className="p-10 text-center border-2 border-dashed border-slate-100 rounded-2xl text-slate-400 text-sm italic">
-              No PRs currently waiting for review.
-            </div>
+          {filtered.length > 0 ? (
+            filtered.map((item) => (
+              <QueueItem key={item.id} row={item} onAction={handleAction} />
+            ))
+          ) : (
+            <EmptyState message="No PRs currently waiting for review." />
           )}
         </div>
       )}

@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { prAPI } from "../../services/api";
 import { formatPHP } from "../../utils/formatters";
+import EmptyState from "../../components/common/EmptyState";
 
 const ApprovalQueueItem = ({ row, onNavigate }) => {
   const impactPct = ((row.pr_amount / (row.remaining_balance + row.pr_amount)) * 100).toFixed(1);
@@ -154,21 +155,23 @@ const ApprovalQueue = ({ onNavigate }) => {
             </span>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="relative">
-            <Search
-              size={14}
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-            />
-            <input
-              type="text"
-              placeholder="Search approved PRs…"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-[13px] focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 transition-all w-56"
-            />
+        {items.length > 0 && (
+          <div className="flex items-center gap-2">
+            <div className="relative">
+              <Search
+                size={14}
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+              />
+              <input
+                type="text"
+                placeholder="Search approved PRs…"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-[13px] focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 transition-all w-56"
+              />
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {loading ? (
@@ -178,13 +181,12 @@ const ApprovalQueue = ({ onNavigate }) => {
         </div>
       ) : (
         <div className="space-y-3">
-          {filtered.map((item) => (
-            <ApprovalQueueItem key={item.id} row={item} onNavigate={onNavigate} />
-          ))}
-          {filtered.length === 0 && (
-            <div className="p-10 text-center border-2 border-dashed border-slate-100 rounded-2xl text-slate-400 text-sm italic">
-              No approved PRs currently waiting for obligation.
-            </div>
+          {filtered.length > 0 ? (
+            filtered.map((item) => (
+              <ApprovalQueueItem key={item.id} row={item} onNavigate={onNavigate} />
+            ))
+          ) : (
+            <EmptyState message="No approved PRs currently waiting for obligation." />
           )}
         </div>
       )}

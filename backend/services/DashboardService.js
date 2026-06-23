@@ -20,17 +20,17 @@ class DashboardService {
 
     const result = {
       fiscalYear: planId,
-      totalBudget: mooeTotal,
+      totalBudget: finSummary.grandTotal, // Use grandTotal instead of just MOOE
       totalObligated: obligatedTotal,
-      remainingBudget: mooeTotal - obligatedTotal,
-      utilizationRate: mooeTotal > 0 ? (obligatedTotal / mooeTotal) * 100 : 0,
+      remainingBudget: finSummary.grandTotal - obligatedTotal,
+      utilizationRate: finSummary.grandTotal > 0 ? (obligatedTotal / finSummary.grandTotal) * 100 : 0,
 
       ps: finSummary.ps,
       rlip: finSummary.rlip,
       personnelTotal: finSummary.personnelTotal,
       mooe: mooeTotal,
       co: finSummary.co || 0,
-      typeSummary: finSummary.typeSummary,
+      grandTotal: finSummary.grandTotal,
       papComposition: finSummary.papComposition,
       workflow: {
         draft: monOverview.counts.draft || 0,

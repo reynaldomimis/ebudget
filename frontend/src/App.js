@@ -7,6 +7,7 @@ import PAPDetailView from "./features/budget-registry/PAPDetailView";
 import Obligations from "./features/transactions/Obligations";
 import ProcurementRequests from "./features/transactions/ProcurementRequests";
 import PAPUtilizationHeatmap from "./features/monitoring/PAPUtilizationHeatmap";
+import MonitoringOverview from "./features/monitoring/MonitoringOverview";
 import ImportCenter from "./features/admin/import/ImportCenter";
 import ReviewQueue from "./features/review/ReviewQueue";
 import ApprovalQueue from "./features/approval/ApprovalQueue";
@@ -26,7 +27,8 @@ export default function App() {
           <Route path="pap-detail/:id" element={<PAPDetailView />} />
           <Route path="create-pr" element={<ProcurementRequests />} />
           <Route path="create-obligation" element={<Obligations />} />
-          <Route path="monitoring" element={<PAPUtilizationHeatmap />} />
+          <Route path="monitoring" element={<MonitoringOverview />} />
+          <Route path="monitoring/heatmap" element={<PAPUtilizationHeatmap />} />
           <Route path="reports" element={<Reports />} />
           <Route path="review-queue" element={<ReviewQueue />} />
           <Route path="approval-queue" element={<ApprovalQueue />} />

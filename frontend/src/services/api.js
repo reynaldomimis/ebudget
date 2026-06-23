@@ -97,7 +97,7 @@ export const obligationAPI = {
 };
 
 export const monitoringAPI = {
-  getOverview: () => api.get("/monitoring/overview"),
+  getOverview: (planId) => api.get("/monitoring/overview", { params: { plan_id: planId } }),
 };
 
 export const reportAPI = {

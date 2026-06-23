@@ -62,25 +62,29 @@ const FYSummaryTable = ({ summary, loading, title = "FY Allotment Summary", vari
   const groupedData = useMemo(() => {
     if (!summary || !Array.isArray(summary.papComposition)) return [];
 
+    // strictly mapping by official DBM codes for government accounting accuracy
     const categories = [
-      { name: 'GAS', keywords: ['General Management', 'Human Resource'] },
-      { name: 'Policy', keywords: ['Policy'] },
-      { name: 'PFNSS', keywords: ['Surveillance'] },
-      { name: 'PGN', keywords: ['Good Nutrition'] },
-      { name: 'Assistance', keywords: ['Assistance'] }
+      { name: 'GAS', typeCode: '100000000000000' },
+      { name: 'Policy', papCode: '310100100001000' },
+      { name: 'PFNSS', papCode: '310100100002000' },
+      { name: 'PGN', papCode: '310100100003000' },
+      { name: 'Assistance', papCode: '310100100004000' }
     ];
 
     const data = categories.map(cat => {
-      const matches = summary.papComposition.filter(row =>
-        cat.keywords.some(key => row.pap_des.includes(key))
-      );
+      const matches = summary.papComposition.filter(row => {
+        if (cat.typeCode) return row.type_code === cat.typeCode;
+        if (cat.papCode) return row.pap_code === cat.papCode;
+        return false;
+      });
+
       return {
         name: cat.name,
-        ps: matches.reduce((sum, r) => sum + r.ps, 0),
-        rlip: matches.reduce((sum, r) => sum + r.rlip, 0),
-        mooe: matches.reduce((sum, r) => sum + r.mooe, 0),
+        ps: matches.reduce((sum, r) => sum + (r.ps || 0), 0),
+        rlip: matches.reduce((sum, r) => sum + (r.rlip || 0), 0),
+        mooe: matches.reduce((sum, r) => sum + (r.mooe || 0), 0),
         co: matches.reduce((sum, r) => sum + (r.co || 0), 0),
-        total: matches.reduce((sum, r) => sum + (r.ps + r.rlip + r.mooe + (r.co || 0)), 0)
+        total: matches.reduce((sum, r) => sum + ((r.ps || 0) + (r.rlip || 0) + (r.mooe || 0) + (r.co || 0)), 0)
       };
     });
 
@@ -356,19 +360,10 @@ const DashboardEmptyState = ({ year, onRefresh }) => (
       <ClipboardList size={40} className="text-emerald-500 opacity-40" />
     </div>
     <h3 className="text-lg font-black text-slate-900 uppercase tracking-tight mb-2">No Financial Data for FY {year}</h3>
-    <p className="text-slate-500 text-[11px] font-bold uppercase tracking-wider text-center max-w-md leading-relaxed mb-8">
+    <p className="text-slate-500 text-[11px] font-bold uppercase tracking-wider text-center max-w-md leading-relaxed">
       The system couldn't find any allotment or transaction records for this fiscal year.
       Please ensure you have uploaded the budget plan or selected the correct period.
     </p>
-    <div className="flex gap-3">
-      <button
-        onClick={onRefresh}
-        className="px-6 py-2.5 bg-emerald-600 text-white rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-200 active:scale-95 flex items-center gap-2"
-      >
-        <RefreshCw size={14} />
-        Retry Sync
-      </button>
-    </div>
   </div>
 );
 

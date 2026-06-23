@@ -9,30 +9,13 @@ import {
   PieChart,
   RefreshCw,
   Search,
-  Filter,
-  Building2,
-  Layout,
-  Download
+  Filter
 } from 'lucide-react';
 import { monitoringAPI } from '../../services/api';
 import { useFiscalYear } from '../../context/FiscalYearContext';
 import { formatPHP } from '../../utils/formatters';
 import PageHeader from '../../components/common/PageHeader';
 import Skeleton from '../../components/common/Skeleton';
-
-/* ─── Compact Health Badge ────────────────────────────────── */
-const HealthBadge = ({ util }) => {
-  let config = { label: 'Healthy', color: 'text-emerald-700 bg-emerald-50 border-emerald-100', dot: 'bg-emerald-500' };
-  if (util > 100) config = { label: 'Critical', color: 'text-rose-700 bg-rose-50 border-rose-100', dot: 'bg-rose-500' };
-  else if (util > 90) config = { label: 'Warning', color: 'text-amber-700 bg-amber-50 border-amber-100', dot: 'bg-amber-500' };
-
-  return (
-    <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full border ${config.color} text-[8px] font-black uppercase tracking-tight`}>
-      <div className={`w-1 h-1 rounded-full ${config.dot}`}></div>
-      {config.label} {util.toFixed(0)}%
-    </div>
-  );
-};
 
 /* ─── Compact Stat Card ────────────────────────────────────── */
 const MonitorCard = ({ title, value, icon: Icon, colorClass = "text-emerald-600", bgClass = "bg-emerald-50", loading }) => {
@@ -65,7 +48,6 @@ const ProgramRow = ({ program, isExpanded, onToggle }) => {
   };
 
   const health = getHealthColor(program.utilization);
-  const Icon = program.name.includes('GENERAL') ? Building2 : Activity;
 
   return (
     <>
@@ -79,7 +61,7 @@ const ProgramRow = ({ program, isExpanded, onToggle }) => {
                {isExpanded ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
             </div>
             <div className={`p-2 rounded-xl flex-shrink-0 ${isExpanded ? 'bg-white/20' : 'bg-emerald-50 text-emerald-600'}`}>
-              <Icon size={18} />
+              <Activity size={18} />
             </div>
             <div className="min-w-0">
               <p className={`text-[12px] font-black uppercase tracking-tight truncate ${isExpanded ? 'text-white' : 'text-slate-900'}`}>{program.name}</p>
@@ -143,13 +125,12 @@ const ProgramRow = ({ program, isExpanded, onToggle }) => {
 };
 
 /* ─── Main Component ───────────────────────────────────────── */
-const PAPRegistryList = () => {
+const MonitoringOverview = () => {
   const { selectedYear, setSelectedYear, availableYears } = useFiscalYear();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [expandedSections, setExpandedSections] = useState({});
-  const [searchTerm, setSearchTerm] = useState('');
 
   const fetchOverview = async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
@@ -176,43 +157,36 @@ const PAPRegistryList = () => {
     setExpandedSections(prev => ({ ...prev, [id]: !prev[id] }));
   };
 
-  const programs = useMemo(() => {
-    if (!data?.programs) return [];
-
-    if (!searchTerm) return data.programs;
-
-    return data.programs.map(prog => {
-      const filteredPaps = (prog.paps || []).filter(pap =>
-        (pap.description || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (prog.name || '').toLowerCase().includes(searchTerm.toLowerCase())
-      );
-
-      if (filteredPaps.length > 0) {
-        return { ...prog, paps: filteredPaps };
-      }
-      return null;
-    }).filter(p => p !== null);
-  }, [data, searchTerm]);
-
   const summary = data?.summary || { ps: 0, rlip: 0, mooe: 0, co: 0, grandTotal: 0 };
+  const programs = data?.programs || [];
 
   return (
     <div className="space-y-6 pb-12 animate-in fade-in duration-700">
       <PageHeader
-        title="Budget Registry"
-        subtitle={`Official inventory of PAPs for Fiscal Year ${selectedYear}.`}
+        title="Monitoring Overview"
+        subtitle={`Programmatic tracking and utilization audit for Fiscal Year ${selectedYear}.`}
         actions={
           <div className="flex items-center gap-3">
             <button
               onClick={() => fetchOverview(true)}
               disabled={loading || refreshing}
-              className="p-2.5 rounded-lg border border-slate-200 bg-white hover:bg-emerald-50 hover:border-emerald-200 transition-all shadow-sm active:scale-95"
+              className="p-2.5 rounded-lg border border-slate-200 bg-white hover:bg-emerald-50 hover:border-emerald-100 transition-all shadow-sm active:scale-95"
             >
               <RefreshCw size={16} className={`${refreshing ? 'animate-spin' : ''} text-emerald-600`} />
             </button>
-            <button className="flex items-center gap-2 px-6 py-2.5 bg-emerald-600 text-white rounded-lg text-[10px] font-black uppercase tracking-widest shadow-lg shadow-emerald-900/20 hover:bg-emerald-700 transition-all active:scale-95">
-               <Download size={14} /> Export Registry
-            </button>
+            <div className="relative group">
+              <select
+                value={selectedYear}
+                onChange={(e) => setSelectedYear(e.target.value)}
+                className="appearance-none pl-10 pr-10 py-2.5 rounded-lg border border-slate-200 bg-white text-slate-900 text-[11px] font-black uppercase tracking-widest cursor-pointer focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all shadow-sm group-hover:border-emerald-500"
+              >
+                {(availableYears || []).map(year => (
+                  <option key={year} value={year}>FY {year}</option>
+                ))}
+              </select>
+              <Filter size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 group-hover:text-emerald-500 transition-colors pointer-events-none" />
+              <ChevronDown size={14} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 group-hover:text-emerald-500 transition-colors pointer-events-none" />
+            </div>
           </div>
         }
       />
@@ -260,16 +234,14 @@ const PAPRegistryList = () => {
               <div className="p-2 bg-white rounded-lg border border-slate-100 shadow-sm text-emerald-600">
                 <Activity size={18} />
               </div>
-              <h3 className="text-[12px] font-black text-slate-900 uppercase tracking-widest">Official Registry Index</h3>
+              <h3 className="text-[12px] font-black text-slate-900 uppercase tracking-widest">Financial Performance Index</h3>
            </div>
            <div className="flex items-center gap-2">
               <div className="relative">
                 <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
                   type="text"
-                  placeholder="SEARCH PAP / PROGRAM..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
+                  placeholder="SEARCH PROGRAM..."
                   className="pl-9 pr-4 py-2 rounded-lg border border-slate-100 bg-white text-[10px] font-bold uppercase tracking-widest focus:outline-none focus:border-emerald-500 transition-all w-64"
                 />
               </div>
@@ -310,7 +282,7 @@ const PAPRegistryList = () => {
                   <td colSpan="7" className="px-6 py-20 text-center">
                     <div className="flex flex-col items-center gap-2 opacity-20">
                       <PieChart size={48} />
-                      <p className="text-xs font-black uppercase tracking-[0.3em]">No Registry Records Found</p>
+                      <p className="text-xs font-black uppercase tracking-[0.3em]">No Program Data Found</p>
                     </div>
                   </td>
                 </tr>
@@ -331,4 +303,4 @@ const PAPRegistryList = () => {
   );
 };
 
-export default PAPRegistryList;
+export default MonitoringOverview;

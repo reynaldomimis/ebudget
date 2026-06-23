@@ -4,6 +4,7 @@ import PageHeader from '../../components/common/PageHeader';
 import DataTable from '../../components/common/DataTable';
 import Button from '../../components/common/Button';
 import StatusBadge from '../../components/common/StatusBadge';
+import EmptyState from '../../components/common/EmptyState';
 import { obligationAPI } from '../../services/api';
 import { formatPHP } from '../../utils/formatters';
 
@@ -105,38 +106,48 @@ const ObligationList = ({ onCreateClick }) => {
         subtitle="Full list of all obligated budget items"
         actions={
           <div className="flex gap-2">
-            <Button variant="secondary" icon={Download} size="sm">Export</Button>
+            {obData.length > 0 && (
+              <Button variant="secondary" icon={Download} size="sm">Export</Button>
+            )}
             <Button variant="primary" icon={Plus} size="sm" onClick={onCreateClick}>Create Obligation</Button>
           </div>
         }
       />
 
       {/* Filter Bar */}
-      <div className="bg-white p-3 rounded-xl border border-neutral-200 shadow-sm flex flex-wrap items-center gap-3">
-        <div className="relative flex-1 min-w-[300px]">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
-          <input
-            type="text"
-            placeholder="Search OBR No, Payee or PR No..."
-            className="w-full pl-9 pr-3 py-2 bg-neutral-50 border border-neutral-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary-100"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
+      {obData.length > 0 && (
+        <div className="bg-white p-3 rounded-xl border border-neutral-200 shadow-sm flex flex-wrap items-center gap-3 animate-in fade-in duration-300">
+          <div className="relative flex-1 min-w-[300px]">
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
+            <input
+              type="text"
+              placeholder="Search OBR No, Payee or PR No..."
+              className="w-full pl-9 pr-3 py-2 bg-neutral-50 border border-neutral-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary-100"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+          <button
+              className="flex items-center gap-1.5 px-3 py-2 text-neutral-500 hover:text-neutral-800 transition-colors"
+              onClick={() => setSearchTerm('')}
+          >
+              <RotateCcw size={14} />
+              <span className="text-xs font-bold uppercase">Reset</span>
+          </button>
         </div>
-        <button
-            className="flex items-center gap-1.5 px-3 py-2 text-neutral-500 hover:text-neutral-800 transition-colors"
-            onClick={() => setSearchTerm('')}
-        >
-            <RotateCcw size={14} />
-            <span className="text-xs font-bold uppercase">Reset</span>
-        </button>
-      </div>
+      )}
 
-      <DataTable
-        columns={columns}
-        data={filtered}
-        loading={loading}
-      />
+      {loading ? (
+        <DataTable columns={columns} data={[]} loading={true} />
+      ) : obData.length > 0 ? (
+        <DataTable
+          columns={columns}
+          data={filtered}
+          loading={loading}
+        />
+      ) : (
+        <EmptyState message="No obligation records discovered for the selected period." />
+      )}
     </div>
   );
 };

@@ -9,7 +9,7 @@ class MonitoringController {
       let { plan_id } = req.query;
       plan_id = await FiscalYearContext.resolvePlanId(plan_id);
 
-      const data = await MonitoringEngine.getOverview(plan_id);
+      const data = await MonitoringEngine.getHierarchicalOverview(plan_id);
       res.json({ success: true, data });
     } catch (error) {
       res.status(500).json({ success: false, error: error.message });

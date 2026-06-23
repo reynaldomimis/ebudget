@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useFiscalYear } from './FiscalYearContext';
-import { financialAPI, dashboardAPI } from '../services/api';
+import { financialAPI, dashboardAPI, monitoringAPI } from '../services/api';
 
 const BudgetContext = createContext();
 
@@ -8,31 +8,51 @@ export const BudgetProvider = ({ children }) => {
   const { selectedYear } = useFiscalYear();
   const [executiveSummary, setExecutiveSummary] = useState(null);
   const [papSummary, setPapSummary] = useState([]);
+  const [monitoringOverview, setMonitoringOverview] = useState(null);
   const [auditFeed, setAuditFeed] = useState([]);
   const [recentTransactions, setRecentTransactions] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
   const refreshBudgetData = useCallback(async () => {
+    if (!selectedYear) return;
+
     setLoading(true);
     setError(null);
     try {
-      const [execResponse, papResponse, auditResponse, transResponse] = await Promise.all([
+      const results = await Promise.allSettled([
         dashboardAPI.getExecutiveSummary(selectedYear),
         financialAPI.getPapSummary(selectedYear),
+        monitoringAPI.getOverview(selectedYear),
         dashboardAPI.getAuditFeed(selectedYear),
         dashboardAPI.getRecentTransactions(selectedYear)
       ]);
 
-      if (execResponse.success) setExecutiveSummary(execResponse.data);
-      if (papResponse.success) setPapSummary(papResponse.data);
-      if (auditResponse.success) setAuditFeed(auditResponse.data);
-      if (transResponse.success) setRecentTransactions(transResponse.data);
+      const [execRes, papRes, monitorRes, auditRes, transRes] = results;
+
+      if (execRes.status === 'fulfilled' && execRes.value.success) setExecutiveSummary(execRes.value.data);
+      if (papRes.status === 'fulfilled' && papRes.value.success) setPapSummary(papRes.value.data);
+      if (monitorRes.status === 'fulfilled' && monitorRes.value.success) setMonitoringOverview(monitorRes.value.data);
+      if (auditRes.status === 'fulfilled' && auditRes.value.success) setAuditFeed(auditRes.value.data);
+      if (transRes.status === 'fulfilled' && transRes.value.success) setRecentTransactions(transRes.value.data);
+
+      // Check for errors in critical calls
+      if (execRes.status === 'rejected') {
+        const errorDetail = execRes.reason?.message || execRes.reason?.error || "Executive Summary failed to load";
+        setError(String(errorDetail));
+      }
+
     } catch (err) {
       console.error("Failed to fetch budget data:", err);
-      // Extract error message from backend if present
-      const msg = err.error || err.message || "Failed to load budget data";
-      setError(msg);
+      let msg = "Failed to load budget data";
+
+      if (typeof err === 'string') {
+        msg = err;
+      } else if (err && typeof err === 'object') {
+        msg = err.message || err.error || "An error occurred";
+      }
+
+      setError(String(msg));
     } finally {
       setLoading(false);
     }
@@ -45,6 +65,7 @@ export const BudgetProvider = ({ children }) => {
   const value = {
     executiveSummary,
     papSummary,
+    monitoringOverview,
     auditFeed,
     recentTransactions,
     loading,

@@ -1,11 +1,11 @@
 import React from 'react';
 
-const inputBaseClasses = "w-full rounded-xl border border-neutral-200 px-4 text-sm font-bold text-neutral-800 transition-all outline-none focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 disabled:opacity-50 disabled:bg-neutral-50 placeholder:text-neutral-300";
+const inputBaseClasses = "w-full rounded-xl border border-neutral-200 px-4 text-sm font-bold text-neutral-800 transition-all outline-none focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 disabled:opacity-50 disabled:bg-neutral-50 placeholder:text-neutral-300 caret-emerald-600";
 const heightClass = "min-h-[48px]";
 
 export const Input = ({ className = "", ...props }) => (
   <input
-    className={`${inputBaseClasses} ${heightClass} ${className}`}
+    className={`${inputBaseClasses} ${heightClass} cursor-text ${className}`}
     {...props}
   />
 );
@@ -13,7 +13,7 @@ export const Input = ({ className = "", ...props }) => (
 export const Select = ({ className = "", children, ...props }) => (
   <div className="relative w-full">
     <select
-      className={`${inputBaseClasses} ${heightClass} appearance-none pr-10 ${className}`}
+      className={`${inputBaseClasses} ${heightClass} appearance-none pr-10 cursor-pointer ${className}`}
       {...props}
     >
       {children}
@@ -28,7 +28,7 @@ export const Select = ({ className = "", children, ...props }) => (
 
 export const Textarea = ({ className = "", ...props }) => (
   <textarea
-    className={`${inputBaseClasses} py-3 min-h-[100px] ${className}`}
+    className={`${inputBaseClasses} py-3 min-h-[100px] cursor-text ${className}`}
     {...props}
   />
 );
