@@ -3,8 +3,9 @@ import React, { createContext, useContext, useState } from 'react';
 const FiscalYearContext = createContext();
 
 export const FiscalYearProvider = ({ children }) => {
-  // Default to 2024 for V1
-  const [selectedYear, setSelectedYear] = useState('2024');
+  // Default to current year
+  const currentYear = new Date().getFullYear().toString();
+  const [selectedYear, setSelectedYear] = useState(currentYear);
   const availableYears = ['2023', '2024', '2025', '2026'];
 
   const value = {

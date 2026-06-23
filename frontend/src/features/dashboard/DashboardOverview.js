@@ -1,11 +1,10 @@
-import React, { useMemo, useEffect } from 'react';
+import React, { useMemo } from 'react';
 import {
   Wallet,
   ArrowDownToLine,
   Clock,
   Activity,
   History,
-  ExternalLink,
   RefreshCw,
   ChevronDown,
   ClipboardList,
@@ -13,13 +12,6 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import {
-  PieChart as RePieChart,
-  Pie,
-  Cell,
-  ResponsiveContainer,
-  Tooltip as ReTooltip
-} from 'recharts';
 import { useBudget } from '../../context/BudgetContext';
 import { useFiscalYear } from '../../context/FiscalYearContext';
 import { formatPHP } from '../../utils/formatters';
@@ -27,54 +19,46 @@ import PageHeader from '../../components/common/PageHeader';
 import Skeleton from '../../components/common/Skeleton';
 import StatusBadge from '../../components/common/StatusBadge';
 
-/* ─── Stat Card Component (Green Theme) ────────────────────────── */
+/* ─── Stat Card Component (Compact) ────────────────────────── */
 const StatCard = ({ title, value, subValue, icon: Icon, variant = 'default', loading }) => {
-  const styles = {
-    default: 'bg-white border-slate-200 text-slate-500',
-    green:   'bg-emerald-50 border-emerald-100 text-emerald-600',
-    primary: 'bg-green-600 border-green-600 text-white',
-  }[variant];
-
   if (loading) {
     return (
-      <div className="bg-white border border-slate-200 rounded-3xl p-6 space-y-3 shadow-sm">
-        <Skeleton className="w-12 h-12 rounded-2xl" />
+      <div className="bg-white border border-slate-200 rounded-lg p-4 space-y-3 shadow-sm">
+        <Skeleton className="w-10 h-10 rounded-lg" />
         <div className="space-y-2">
-          <Skeleton className="h-3 w-20" />
-          <Skeleton className="h-8 w-32" />
+          <Skeleton className="h-2 w-16" />
+          <Skeleton className="h-6 w-24" />
         </div>
       </div>
     );
   }
 
   return (
-    <div className={`border rounded-[32px] p-6 flex flex-col gap-6 hover:shadow-xl hover:-translate-y-1 transition-all duration-500 relative overflow-hidden group ${variant === 'primary' ? 'bg-green-600 text-white border-green-600 shadow-lg shadow-green-200' : 'bg-white border-slate-100 shadow-sm'}`}>
+    <div className={`border rounded-lg p-4 flex flex-col gap-4 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-500 relative overflow-hidden group ${variant === 'primary' ? 'bg-green-600 text-white border-green-600 shadow-md shadow-green-200' : 'bg-white border-slate-100 shadow-sm'}`}>
       <div className="flex items-start justify-between">
-        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-500 group-hover:rotate-6 group-hover:scale-110 ${variant === 'primary' ? 'bg-white/20 text-white' : 'bg-emerald-50 text-emerald-600'}`}>
-          <Icon size={24} />
+        <div className={`w-10 h-10 rounded-lg flex items-center justify-center transition-all duration-500 group-hover:rotate-6 group-hover:scale-110 ${variant === 'primary' ? 'bg-white/20 text-white' : 'bg-emerald-50 text-emerald-600'}`}>
+          <Icon size={20} />
         </div>
         {variant !== 'primary' && (
-           <div className="w-8 h-8 rounded-full bg-emerald-50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-              <CheckCircle2 size={14} className="text-emerald-500" />
+           <div className="w-6 h-6 rounded-full bg-emerald-50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+              <CheckCircle2 size={12} className="text-emerald-500" />
            </div>
         )}
       </div>
       <div>
-        <p className={`text-[10px] font-black uppercase tracking-[0.2em] mb-2 ${variant === 'primary' ? 'text-green-100' : 'text-slate-400'}`}>{title}</p>
-        <p className={`text-2xl font-black tracking-tight leading-none font-mono ${variant === 'primary' ? 'text-white' : 'text-slate-900'}`}>
+        <p className={`text-[9px] font-black uppercase tracking-[0.15em] mb-1.5 ${variant === 'primary' ? 'text-green-100' : 'text-slate-400'}`}>{title}</p>
+        <p className={`text-xl font-black tracking-tight leading-none font-mono ${variant === 'primary' ? 'text-white' : 'text-slate-900'}`}>
           {value}
         </p>
-        <p className={`text-[11px] mt-3 font-bold uppercase tracking-wider ${variant === 'primary' ? 'text-green-200' : 'text-emerald-600'}`}>{subValue}</p>
+        <p className={`text-[10px] mt-2 font-bold uppercase tracking-wider ${variant === 'primary' ? 'text-green-200' : 'text-emerald-600'}`}>{subValue}</p>
       </div>
-
-      {/* Abstract Background Decoration */}
-      <div className={`absolute -right-4 -bottom-4 w-24 h-24 rounded-full blur-3xl opacity-10 transition-all duration-700 group-hover:opacity-20 ${variant === 'primary' ? 'bg-white' : 'bg-green-500'}`} />
+      <div className={`absolute -right-3 -bottom-3 w-20 h-20 rounded-full blur-3xl opacity-10 transition-all duration-700 group-hover:opacity-20 ${variant === 'primary' ? 'bg-white' : 'bg-green-500'}`} />
     </div>
   );
 };
 
-/* ─── FY ALLOTMENT COMPOSITION MATRIX ─────────────────────── */
-const FYSummaryTable = ({ summary, loading }) => {
+/* ─── Unified Summary Table ────────────────────────────────── */
+const FYSummaryTable = ({ summary, loading, title = "FY Allotment Summary", variant = "FY" }) => {
   const groupedData = useMemo(() => {
     if (!summary || !Array.isArray(summary.papComposition)) return [];
 
@@ -86,30 +70,34 @@ const FYSummaryTable = ({ summary, loading }) => {
       { name: 'Assistance', keywords: ['Assistance'] }
     ];
 
-    return categories.map(cat => {
+    const data = categories.map(cat => {
       const matches = summary.papComposition.filter(row =>
         cat.keywords.some(key => row.pap_des.includes(key))
       );
       return {
         name: cat.name,
         ps: matches.reduce((sum, r) => sum + r.ps, 0),
+        rlip: matches.reduce((sum, r) => sum + r.rlip, 0),
         mooe: matches.reduce((sum, r) => sum + r.mooe, 0),
-        co: matches.reduce((sum, r) => sum + r.co, 0),
-        total: matches.reduce((sum, r) => sum + (r.ps + r.mooe + r.co), 0)
+        co: matches.reduce((sum, r) => sum + (r.co || 0), 0),
+        total: matches.reduce((sum, r) => sum + (r.ps + r.rlip + r.mooe + (r.co || 0)), 0)
       };
     });
+
+    return data.filter(d => d.total > 0);
   }, [summary]);
 
   const totals = useMemo(() => {
     return groupedData.reduce((acc, row) => ({
       ps: acc.ps + row.ps,
+      rlip: acc.rlip + row.rlip,
       mooe: acc.mooe + row.mooe,
       co: acc.co + row.co,
       total: acc.total + row.total
-    }), { ps: 0, mooe: 0, co: 0, total: 0 });
+    }), { ps: 0, rlip: 0, mooe: 0, co: 0, total: 0 });
   }, [groupedData]);
 
-  if (loading) return <Skeleton className="h-[450px] rounded-[40px]" />;
+  if (loading) return <Skeleton className="h-[400px] rounded-lg" />;
   if (!summary) return null;
 
   const cell = (val, isBold = false) =>
@@ -121,213 +109,161 @@ const FYSummaryTable = ({ summary, loading }) => {
       <span className="text-slate-300">—</span>
     );
 
+  const isPS = variant === "PS";
+
   return (
-    <div className="bg-white border border-slate-100 rounded-[40px] overflow-hidden flex flex-col h-full shadow-sm hover:shadow-xl transition-all duration-500">
-      <div className="px-8 py-6 border-b border-slate-50 flex items-center justify-between bg-white">
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-emerald-50 rounded-xl text-emerald-600">
-            <ClipboardList size={18} />
+    <div className="bg-white border border-slate-100 rounded-lg overflow-hidden flex flex-col h-full shadow-sm hover:shadow-lg transition-all duration-500">
+      <div className="px-4 py-2 border-b border-slate-50 flex items-center justify-between bg-white">
+        <div className="flex items-center gap-2">
+          <div className="p-1 bg-emerald-50 rounded text-emerald-600">
+            <ClipboardList size={14} />
           </div>
-          <h4 className="text-[11px] font-black text-slate-900 uppercase tracking-[0.15em]">FY Allotment Summary</h4>
+          <h4 className="text-[10px] font-black text-slate-900 uppercase tracking-[0.1em]">{title}</h4>
         </div>
       </div>
 
-      <div className="overflow-x-auto">
+      <div className={`overflow-x-auto custom-scrollbar ${isPS ? 'flex-1' : ''}`}>
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-slate-50/50">
-              <th className="px-8 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">Summary</th>
-              <th className="px-8 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest text-right">PS</th>
-              <th className="px-8 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest text-right">MOOE</th>
-              <th className="px-8 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest text-right">CO</th>
-              <th className="px-8 py-4 text-[9px] font-black text-slate-900 uppercase tracking-widest text-right">Grand Total</th>
+              <th className="px-2 py-2 text-[8px] font-black text-slate-400 uppercase tracking-widest">Summary</th>
+              <th className="px-2 py-2 text-[8px] font-black text-slate-400 uppercase tracking-widest text-right">PS</th>
+              {isPS ? (
+                <th className="px-2 py-2 text-[8px] font-black text-slate-400 uppercase tracking-widest text-right">RLIP</th>
+              ) : (
+                <>
+                  <th className="px-2 py-2 text-[8px] font-black text-slate-400 uppercase tracking-widest text-right">MOOE</th>
+                  <th className="px-2 py-2 text-[8px] font-black text-slate-400 uppercase tracking-widest text-right">CO</th>
+                </>
+              )}
+              <th className="px-2 py-2 text-[8px] font-black text-slate-900 uppercase tracking-widest text-right">Total</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-50">
-            {groupedData.map((row, idx) => (
-              <tr key={idx} className="hover:bg-emerald-50/30 transition-colors group">
-                <td className="px-8 py-4 text-[11px] font-bold text-slate-600 group-hover:text-emerald-700 uppercase">{row.name}</td>
-                <td className="px-8 py-4 text-right text-[11px] text-slate-500">{cell(row.ps)}</td>
-                <td className="px-8 py-4 text-right text-[11px] text-slate-500">{cell(row.mooe)}</td>
-                <td className="px-8 py-4 text-right text-[11px] text-slate-500">{cell(row.co)}</td>
-                <td className="px-8 py-4 text-right text-[11px] font-black text-slate-900">{cell(row.total)}</td>
+            {groupedData.length > 0 ? (
+              groupedData.map((row, idx) => (
+                <tr key={idx} className="hover:bg-emerald-50/30 transition-colors group">
+                  <td className="px-2 py-1.5 text-[10px] font-bold text-slate-600 group-hover:text-emerald-700 uppercase">{row.name}</td>
+                  <td className="px-2 py-1.5 text-right text-[10px] text-slate-500">{cell(row.ps)}</td>
+                  {isPS ? (
+                    <td className="px-2 py-1.5 text-right text-[10px] text-slate-500">{cell(row.rlip)}</td>
+                  ) : (
+                    <>
+                      <td className="px-2 py-1.5 text-right text-[10px] text-slate-500">{cell(row.mooe)}</td>
+                      <td className="px-2 py-1.5 text-right text-[10px] text-slate-500">{cell(row.co)}</td>
+                    </>
+                  )}
+                  <td className="px-2 py-1.5 text-right text-[10px] font-black text-slate-900">
+                    {cell(isPS ? row.ps + row.rlip : row.total)}
+                  </td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan={isPS ? 4 : 5} className="px-6 py-12 text-center text-slate-400 text-[9px] uppercase font-black">No Data Found</td>
               </tr>
-            ))}
+            )}
           </tbody>
-          <tfoot className="border-t-2 border-slate-100">
-            <tr className="bg-slate-50/30">
-              <td className="px-8 py-4 text-[11px] font-black uppercase text-slate-900">Total</td>
-              <td className="px-8 py-4 text-right text-[11px] font-black text-slate-900">{cell(totals.ps, true)}</td>
-              <td className="px-8 py-4 text-right text-[11px] font-black text-slate-900">{cell(totals.mooe, true)}</td>
-              <td className="px-8 py-4 text-right text-[11px] font-black text-slate-900">{cell(totals.co, true)}</td>
-              <td className="px-8 py-4 text-right text-[11px] font-black text-slate-900">{cell(totals.total, true)}</td>
-            </tr>
-            <tr>
-              <td className="px-8 py-4 text-[11px] font-bold uppercase text-slate-500">RLIP</td>
-              <td className="px-8 py-4 text-right text-[11px] text-slate-500">{cell(Number(summary.rlip) || 0)}</td>
-              <td className="px-8 py-4 text-right text-[11px] text-slate-500">{cell(0)}</td>
-              <td className="px-8 py-4 text-right text-[11px] text-slate-500">{cell(0)}</td>
-              <td className="px-8 py-4 text-right text-[11px] font-bold text-slate-500">{cell(Number(summary.rlip) || 0)}</td>
-            </tr>
-            <tr className="bg-emerald-600 text-white">
-              <td className="px-8 py-5 text-[11px] font-black uppercase">Grand Total</td>
-              <td className="px-8 py-5 text-right text-[11px] font-black">{cell(totals.ps + (Number(summary.rlip) || 0))}</td>
-              <td className="px-8 py-5 text-right text-[11px] font-black">{cell(totals.mooe)}</td>
-              <td className="px-8 py-5 text-right text-[11px] font-black">{cell(totals.co)}</td>
-              <td className="px-8 py-5 text-right text-[13px] font-black bg-emerald-700">{cell(totals.total + (Number(summary.rlip) || 0))}</td>
-            </tr>
-          </tfoot>
+          {!isPS && (
+            <tfoot className="border-t border-slate-100">
+              <tr className="bg-slate-50/30">
+                <td className="px-2 py-1.5 text-[9px] font-black uppercase text-slate-900">Total</td>
+                <td className="px-2 py-1.5 text-right text-[9px] font-black text-slate-900">{cell(totals.ps, true)}</td>
+                <td className="px-2 py-1.5 text-right text-[9px] font-black text-slate-900">{cell(totals.mooe, true)}</td>
+                <td className="px-2 py-1.5 text-right text-[9px] font-black text-slate-900">{cell(totals.co, true)}</td>
+                <td className="px-2 py-1.5 text-right text-[9px] font-black text-slate-900">{cell(totals.ps + totals.mooe + totals.co, true)}</td>
+              </tr>
+              <tr>
+                <td className="px-2 py-1.5 text-[9px] font-bold uppercase text-slate-500">RLIP</td>
+                <td className="px-2 py-1.5 text-right text-[9px] text-slate-500">{cell(Number(summary.rlip) || 0)}</td>
+                <td className="px-2 py-1.5 text-right text-[9px] text-slate-500">{cell(0)}</td>
+                <td className="px-2 py-1.5 text-right text-[9px] text-slate-500">{cell(0)}</td>
+                <td className="px-2 py-1.5 text-right text-[9px] font-bold text-slate-500">{cell(Number(summary.rlip) || 0)}</td>
+              </tr>
+              <tr className="bg-emerald-600 text-white">
+                <td className="px-2 py-2 text-[10px] font-black uppercase">Grand Total</td>
+                <td className="px-2 py-2 text-right text-[10px] font-black">{cell(totals.ps + (Number(summary.rlip) || 0))}</td>
+                <td className="px-2 py-2 text-right text-[10px] font-black">{cell(totals.mooe)}</td>
+                <td className="px-2 py-2 text-right text-[10px] font-black">{cell(totals.co)}</td>
+                <td className="px-2 py-2 text-right text-[10px] font-black bg-emerald-700">{cell(totals.total + (Number(summary.rlip) || 0))}</td>
+              </tr>
+            </tfoot>
+          )}
         </table>
       </div>
-    </div>
-  );
-};
 
-/* ─── Workflow Pulse (Donut Chart - Green Theme) ────────────────── */
-const WorkflowPulse = ({ data, loading }) => {
-  const navigate = useNavigate();
-
-  const chartData = useMemo(() => {
-    if (!data) return [];
-    return [
-      { name: 'Draft', value: data.draft || 0, color: '#e2e8f0' },
-      { name: 'For Review', value: data.review || 0, color: '#fbbf24' },
-      { name: 'Approved', value: data.approved || 0, color: '#10b981' },
-      { name: 'Partial', value: data.partiallyObligated || 0, color: '#3b82f6' },
-      { name: 'Obligated', value: data.obligated || 0, color: '#059669' },
-      { name: 'Rejected', value: data.rejected || 0, color: '#ef4444' },
-    ].filter(item => item.value > 0);
-  }, [data]);
-
-  const total = chartData.reduce((acc, curr) => acc + curr.value, 0);
-
-  if (loading) return <Skeleton className="h-[450px] rounded-[40px]" />;
-
-  return (
-    <div className="bg-white border border-slate-100 rounded-[40px] p-8 h-full flex flex-col shadow-sm hover:shadow-xl transition-all duration-500">
-      <div className="flex items-center justify-between mb-10">
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-emerald-50 rounded-xl text-emerald-600">
-            <Activity size={18} />
-          </div>
-          <h3 className="text-[11px] font-black text-slate-900 uppercase tracking-[0.15em]">Workflow Pulse</h3>
+      {isPS && (
+        <div className="mt-auto border-t border-slate-100 bg-emerald-600 text-white">
+          <table className="w-full text-left border-collapse">
+            <tfoot>
+              <tr>
+                <td className="px-2 py-2 text-[10px] font-black uppercase w-[25.5%]">Grand Total</td>
+                <td className="px-2 py-2 text-right text-[10px] font-black w-[23.5%]">{cell(totals.ps)}</td>
+                <td className="px-2 py-2 text-right text-[10px] font-black w-[23.5%]">{cell(totals.rlip)}</td>
+                <td className="px-2 py-2 text-right text-[10px] font-black bg-emerald-700">{cell(totals.ps + totals.rlip)}</td>
+              </tr>
+            </tfoot>
+          </table>
         </div>
-        <button
-          onClick={() => navigate('/review-queue')}
-          className="px-4 py-2 bg-slate-900 text-white text-[9px] font-black uppercase tracking-widest rounded-full hover:bg-emerald-600 transition-all shadow-lg shadow-slate-900/10"
-        >
-          Manage Queues
-        </button>
-      </div>
-
-      <div className="flex-1 flex flex-col items-center justify-center gap-8">
-        <div className="w-full h-56 relative group">
-          {total > 0 ? (
-            <>
-              <ResponsiveContainer width="100%" height="100%">
-                <RePieChart>
-                  <Pie
-                    data={chartData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={70}
-                    outerRadius={95}
-                    paddingAngle={8}
-                    dataKey="value"
-                    stroke="none"
-                  >
-                    {chartData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <ReTooltip
-                    contentStyle={{ borderRadius: '24px', border: 'none', padding: '12px 20px', boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1)' }}
-                    itemStyle={{ fontSize: '12px', fontWeight: '900', textTransform: 'uppercase', letterSpacing: '0.05em' }}
-                  />
-                </RePieChart>
-              </ResponsiveContainer>
-              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                 <span className="text-3xl font-black text-slate-900 font-mono">{total}</span>
-                 <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Total PRs</span>
-              </div>
-            </>
-          ) : (
-            <div className="h-full flex flex-col items-center justify-center text-slate-300 gap-4">
-              <RefreshCw size={48} className="opacity-20 animate-spin-slow" />
-              <p className="text-[10px] font-black uppercase tracking-[0.2em]">Awaiting Incoming Workflow</p>
-            </div>
-          )}
-        </div>
-
-        <div className="w-full grid grid-cols-2 sm:grid-cols-3 gap-4 mt-4">
-          {chartData.map((item, idx) => (
-            <div key={idx} className="flex flex-col gap-1 p-3 rounded-2xl bg-slate-50 border border-slate-100 group hover:bg-white hover:shadow-lg transition-all duration-300">
-              <div className="flex items-center gap-2">
-                <div className="w-2.5 h-2.5 rounded-full ring-4 ring-white shadow-sm" style={{ backgroundColor: item.color }} />
-                <span className="text-[9px] font-black text-slate-400 uppercase truncate group-hover:text-slate-600 transition-colors">{item.name}</span>
-              </div>
-              <span className="text-lg font-black text-slate-900 ml-4 font-mono">{item.value}</span>
-            </div>
-          ))}
-        </div>
-      </div>
+      )}
     </div>
   );
 };
 
 /* ─── Recent Transactions Table ────────────────────────────────── */
 const RecentTransactionsTable = ({ transactions, loading }) => {
-  if (loading) return <Skeleton className="h-[500px] rounded-[40px]" />;
+  const { selectedYear } = useFiscalYear();
+  if (loading) return <Skeleton className="h-[400px] rounded-lg" />;
 
   return (
-    <div className="bg-white border border-slate-100 rounded-[40px] overflow-hidden flex flex-col h-[580px] shadow-sm hover:shadow-xl transition-all duration-500">
-      <div className="px-8 py-6 border-b border-slate-50 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-emerald-50 rounded-xl text-emerald-600">
-            <Activity size={18} />
+    <div className="bg-white border border-slate-100 rounded-lg overflow-hidden flex flex-col h-[520px] shadow-sm hover:shadow-lg transition-all duration-500">
+      <div className="px-4 py-2.5 border-b border-slate-50 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <div className="p-1 bg-emerald-50 rounded text-emerald-600">
+            <Activity size={14} />
           </div>
-          <h4 className="text-[11px] font-black text-slate-900 uppercase tracking-[0.15em]">Live Transactions</h4>
+          <h4 className="text-[10px] font-black text-slate-900 uppercase tracking-[0.1em]">Live Transactions</h4>
         </div>
         <div className="flex items-center gap-2">
-           <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-           <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Live Sync</span>
+           <div className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse" />
+           <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Live Sync</span>
         </div>
       </div>
 
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto flex-1 custom-scrollbar">
         <table className="w-full text-left border-collapse">
           <thead>
-            <tr className="bg-slate-50/50">
-              <th className="px-8 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">Reference</th>
-              <th className="px-8 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">Type</th>
-              <th className="px-8 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest text-right">Amount</th>
-              <th className="px-8 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest text-center">Status</th>
-              <th className="px-8 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest text-right">Date</th>
+            <tr className="bg-slate-50/50 sticky top-0 z-10">
+              <th className="px-2 py-2 text-[8px] font-black text-slate-400 uppercase tracking-widest">Reference</th>
+              <th className="px-2 py-2 text-[8px] font-black text-slate-400 uppercase tracking-widest">Type</th>
+              <th className="px-2 py-2 text-[8px] font-black text-slate-400 uppercase tracking-widest text-right">Amount</th>
+              <th className="px-2 py-2 text-[8px] font-black text-slate-400 uppercase tracking-widest text-center">Status</th>
+              <th className="px-2 py-2 text-[8px] font-black text-slate-400 uppercase tracking-widest text-right">Date</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-50">
             {transactions && transactions.length > 0 ? (
               transactions.map((trx, idx) => (
                 <tr key={idx} className="hover:bg-emerald-50/30 transition-colors group">
-                  <td className="px-8 py-4">
+                  <td className="px-2 py-1.5">
                     <div className="flex flex-col">
-                      <span className="text-[11px] font-black text-slate-900 uppercase group-hover:text-emerald-700">{trx.reference}</span>
-                      <span className="text-[9px] text-slate-400 font-bold uppercase truncate max-w-[200px]">{trx.description}</span>
+                      <span className="text-[10px] font-black text-slate-900 uppercase group-hover:text-emerald-700">{trx.reference}</span>
+                      <span className="text-[8px] text-slate-400 font-bold uppercase truncate max-w-[150px]">{trx.description}</span>
                     </div>
                   </td>
-                  <td className="px-8 py-4">
-                    <span className={`text-[10px] font-black px-2 py-1 rounded-lg ${trx.type === 'PR' ? 'bg-blue-50 text-blue-600' : 'bg-purple-50 text-purple-600'}`}>
+                  <td className="px-2 py-1.5">
+                    <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-md ${trx.type === 'PR' ? 'bg-blue-50 text-blue-600' : 'bg-purple-50 text-purple-600'}`}>
                       {trx.type}
                     </span>
                   </td>
-                  <td className="px-8 py-4 text-right">
-                    <span className="text-[11px] font-mono font-bold text-slate-900">₱{formatPHP(trx.amount)}</span>
+                  <td className="px-2 py-1.5 text-right">
+                    <span className="text-[10px] font-mono font-bold text-slate-900">₱{formatPHP(trx.amount)}</span>
                   </td>
-                  <td className="px-8 py-4 text-center">
+                  <td className="px-2 py-1.5 text-center">
                     <StatusBadge status={trx.status} size="sm" />
                   </td>
-                  <td className="px-8 py-4 text-right">
-                    <span className="text-[10px] text-slate-500 font-bold font-mono">
+                  <td className="px-2 py-1.5 text-right">
+                    <span className="text-[9px] text-slate-500 font-bold font-mono">
                       {new Date(trx.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
                     </span>
                   </td>
@@ -335,20 +271,14 @@ const RecentTransactionsTable = ({ transactions, loading }) => {
               ))
             ) : (
               <tr>
-                <td colSpan="5" className="px-8 py-20 text-center">
-                  <div className="flex flex-col items-center gap-3 opacity-20">
-                    <Activity size={40} />
-                    <span className="text-[10px] font-black uppercase tracking-[0.2em]">No Recent Activity</span>
-                  </div>
-                </td>
+                <td colSpan="5" className="px-6 py-12 text-center text-slate-400 text-[9px] uppercase font-black">No Activity for {selectedYear}</td>
               </tr>
             )}
           </tbody>
         </table>
       </div>
-
-      <div className="p-6 mt-auto border-t border-slate-50">
-        <button className="w-full py-3 rounded-2xl border border-slate-100 bg-slate-50 text-[9px] font-black text-slate-500 uppercase tracking-[0.2em] hover:bg-emerald-600 hover:text-white hover:border-emerald-600 transition-all duration-300">
+      <div className="p-3 mt-auto border-t border-slate-50">
+        <button className="w-full py-2 rounded border border-slate-100 bg-slate-50 text-[8px] font-black text-slate-500 uppercase tracking-[0.15em] hover:bg-emerald-600 hover:text-white hover:border-emerald-600 transition-all duration-300">
           View All Transactions
         </button>
       </div>
@@ -356,63 +286,63 @@ const RecentTransactionsTable = ({ transactions, loading }) => {
   );
 };
 
-/* ─── Audit Feed Component (Maintained Black Theme) ─────────────── */
+/* ─── Audit Feed Component ────────────────────────────────────── */
 const AuditFeed = ({ logs, loading }) => {
   const navigate = useNavigate();
 
   const getActionIcon = (action) => {
-    if (action.includes('PR')) return <Wallet size={12} className="text-blue-400" />;
-    if (action.includes('OBLIGATION')) return <ArrowDownToLine size={12} className="text-emerald-400" />;
-    return <Activity size={12} className="text-slate-400" />;
+    if (action.includes('PR')) return <Wallet size={10} className="text-blue-400" />;
+    if (action.includes('OBLIGATION')) return <ArrowDownToLine size={10} className="text-emerald-400" />;
+    return <Activity size={10} className="text-slate-400" />;
   };
 
-  if (loading) return <Skeleton className="h-96 rounded-[40px]" />;
+  if (loading) return <Skeleton className="h-96 rounded-lg" />;
 
   return (
-    <div className="bg-[#0f172a] rounded-[40px] p-8 text-white flex flex-col h-[580px] shadow-2xl shadow-slate-900/50 border border-slate-800">
-      <div className="flex items-center justify-between mb-8">
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-slate-800 rounded-xl text-blue-400">
-            <History size={18} />
+    <div className="bg-[#0f172a] rounded-lg p-4 text-white flex flex-col h-[520px] shadow-2xl shadow-slate-900/50 border border-slate-800">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <div className="p-1 bg-slate-800 rounded text-blue-400">
+            <History size={14} />
           </div>
-          <span className="text-[11px] font-black text-blue-400 uppercase tracking-[0.2em]">Live Audit Intelligence</span>
+          <span className="text-[10px] font-black text-blue-400 uppercase tracking-[0.15em]">Live Audit Intelligence</span>
         </div>
         <div className="flex items-center gap-2">
-           <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-           <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Real-time Sync</span>
+           <div className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse" />
+           <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Real-time Sync</span>
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto pr-4 custom-scrollbar space-y-6 max-h-[380px]">
+      <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar space-y-3">
         {logs && logs.length > 0 ? (
           logs.slice(0, 20).map((log, idx) => (
-            <div key={idx} className="flex gap-6 group cursor-default relative">
-              {idx !== logs.length - 1 && <div className="absolute left-4 top-10 bottom-[-24px] w-px bg-slate-800" />}
+            <div key={idx} className="flex gap-3 group cursor-default relative">
+              {idx !== logs.length - 1 && <div className="absolute left-2.5 top-6 bottom-[-16px] w-px bg-slate-800" />}
               <div className="flex-shrink-0 relative z-10">
-                <div className="w-9 h-9 rounded-full bg-slate-900 flex items-center justify-center border border-slate-800 transition-all duration-300 group-hover:border-blue-500 group-hover:scale-110">
+                <div className="w-6 h-6 rounded-full bg-slate-900 flex items-center justify-center border border-slate-800 transition-all duration-300 group-hover:border-blue-500 group-hover:scale-110">
                   {getActionIcon(log.action)}
                 </div>
               </div>
-              <div className="flex-1 flex flex-col pb-2">
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-[10px] font-black text-slate-200 uppercase tracking-widest group-hover:text-blue-400 transition-colors">{log.action.replace(/_/g, ' ')}</span>
-                  <span className="text-[9px] text-slate-600 font-bold font-mono">{new Date(log.timestamp).toLocaleTimeString()}</span>
+              <div className="flex-1 flex flex-col pb-1">
+                <div className="flex items-center justify-between mb-0.5">
+                  <span className="text-[9px] font-black text-slate-200 uppercase tracking-widest group-hover:text-blue-400 transition-colors">{log.action.replace(/_/g, ' ')}</span>
+                  <span className="text-[8px] text-slate-600 font-bold font-mono">{new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                 </div>
-                <p className="text-[12px] text-slate-500 group-hover:text-slate-400 transition-colors leading-relaxed">
-                  System detected {log.ref_type} <span className="text-slate-300 font-bold">#{log.ref_id || 'ID-TRX'}</span> interaction on financial ledger.
+                <p className="text-[10px] text-slate-500 group-hover:text-slate-400 transition-colors leading-relaxed">
+                  System detected {log.ref_type} <span className="text-slate-300 font-bold">#{log.ref_id || 'ID-TRX'}</span> interaction.
                 </p>
               </div>
             </div>
           ))
         ) : (
-          <div className="h-full flex flex-col items-center justify-center text-slate-700 gap-4">
-            <History size={48} className="opacity-10" />
-            <p className="text-[10px] font-black uppercase tracking-[0.3em]">System Standby • No Logs</p>
+          <div className="h-full flex flex-col items-center justify-center text-slate-700 gap-2">
+            <History size={32} className="opacity-10" />
+            <p className="text-[9px] font-black uppercase tracking-[0.2em]">No Logs</p>
           </div>
         )}
       </div>
 
-      <button className="mt-10 w-full py-4 rounded-2xl border border-slate-800 bg-slate-900/50 text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] hover:bg-slate-800 hover:text-white transition-all duration-300">
+      <button className="mt-4 w-full py-2.5 rounded border border-slate-800 bg-slate-900/50 text-[8px] font-black text-slate-500 uppercase tracking-[0.2em] hover:bg-slate-800 hover:text-white transition-all duration-300">
         Access Full Security Logs
       </button>
     </div>
@@ -433,32 +363,32 @@ const DashboardOverview = () => {
   };
 
   return (
-    <div className="space-y-8 pb-20 animate-in fade-in slide-in-from-bottom-4 duration-1000">
+    <div className="space-y-4 pb-12 animate-in fade-in slide-in-from-bottom-4 duration-1000">
       <PageHeader
         title="Executive Dashboard"
         subtitle={`Real-time financial intelligence for Fiscal Year ${selectedYear}.`}
         actions={
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
             <button
               onClick={refreshBudgetData}
               disabled={loading}
-              className="p-3 rounded-2xl border border-slate-100 bg-white hover:bg-emerald-50 hover:border-emerald-100 transition-all duration-300 shadow-sm active:scale-95"
+              className="p-2 rounded border border-slate-100 bg-white hover:bg-emerald-50 hover:border-emerald-100 transition-all duration-300 shadow-sm active:scale-95"
             >
-              <RefreshCw size={16} className={`${loading ? 'animate-spin' : ''} text-emerald-600`} />
+              <RefreshCw size={14} className={`${loading ? 'animate-spin' : ''} text-emerald-600`} />
             </button>
             <div className="relative group">
               <select
                 value={selectedYear}
                 onChange={(e) => setSelectedYear(e.target.value)}
-                className="appearance-none pl-6 pr-12 py-3 rounded-2xl border border-slate-100 bg-white text-slate-900 text-[11px] font-black uppercase tracking-[0.1em] cursor-pointer focus:outline-none group-hover:border-emerald-500 transition-all shadow-sm"
+                className="appearance-none pl-3 pr-8 py-2 rounded border border-slate-100 bg-white text-slate-900 text-[10px] font-black uppercase tracking-[0.1em] cursor-pointer focus:outline-none group-hover:border-emerald-500 transition-all shadow-sm"
               >
                 {(availableYears || []).map(year => (
                   <option key={year} value={year}>FY {year}</option>
                 ))}
               </select>
               <ChevronDown
-                size={16}
-                className="absolute right-5 top-1/2 -translate-y-1/2 text-slate-400 group-hover:text-emerald-500 transition-colors pointer-events-none"
+                size={14}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 group-hover:text-emerald-500 transition-colors pointer-events-none"
               />
             </div>
           </div>
@@ -466,17 +396,17 @@ const DashboardOverview = () => {
       />
 
       {error && (
-        <div className="p-5 bg-rose-50 border border-rose-100 rounded-3xl flex items-center gap-4 text-rose-600 animate-bounce">
-          <AlertCircle size={20} />
-          <p className="text-[11px] font-black uppercase tracking-widest">System Sync Error: {error}</p>
+        <div className="p-3 bg-rose-50 border border-rose-100 rounded flex items-center gap-3 text-rose-600 animate-bounce">
+          <AlertCircle size={18} />
+          <p className="text-[10px] font-black uppercase tracking-widest">System Sync Error: {error}</p>
         </div>
       )}
 
       {/* SECTION 1: KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           title="Total Budget"
-          value={`₱${formatPHP(summary.totalBudget || summary.grandTotal)}`}
+          value={`₱${formatPHP(summary.totalBudget)}`}
           subValue="Allocated Allotment"
           icon={Wallet}
           variant="primary"
@@ -484,14 +414,14 @@ const DashboardOverview = () => {
         />
         <StatCard
           title="Total Obligated"
-          value={`₱${formatPHP(summary.totalObligated || (summary.obligated && summary.obligated.total))}`}
+          value={`₱${formatPHP(summary.totalObligated)}`}
           subValue="Processed Ledger"
           icon={ArrowDownToLine}
           loading={loading}
         />
         <StatCard
           title="Unobligated"
-          value={`₱${formatPHP(summary.remainingBudget || (summary.balance && summary.balance.total))}`}
+          value={`₱${formatPHP(summary.remainingBudget)}`}
           subValue="Available Fund"
           icon={Clock}
           loading={loading}
@@ -505,18 +435,18 @@ const DashboardOverview = () => {
         />
       </div>
 
-      {/* SECTION 2: Workflow & Allotment Composition */}
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 items-stretch">
+      {/* SECTION 2: PS Summary & MOOE Summary */}
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 items-stretch">
         <div className="lg:col-span-2">
-          <WorkflowPulse data={summary.workflow} loading={loading} />
+          <FYSummaryTable summary={summary} loading={loading} title="PS Summary" variant="PS" />
         </div>
         <div className="lg:col-span-3">
-          <FYSummaryTable summary={summary} loading={loading} />
+          <FYSummaryTable summary={summary} loading={loading} title="MOOE Summary" variant="FY" />
         </div>
       </div>
 
       {/* SECTION 3: Live Audit & Transactions */}
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 items-stretch">
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 items-stretch">
         <div className="lg:col-span-3">
           <RecentTransactionsTable transactions={recentTransactions} loading={loading} />
         </div>
