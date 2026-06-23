@@ -52,7 +52,25 @@ class DashboardService {
     return result;
   }
 
-  static async getRecentTransactions(limit = 10) {
+  static async getAuditFeed(planId) {
+    const year = planId ? (String(planId).includes('-') ? planId.split('-')[1] : planId) : null;
+
+    let query = "SELECT * FROM audit_logs";
+    const params = [];
+
+    if (year && /^20\d{2}$/.test(year)) {
+      query += " WHERE YEAR(timestamp) = ?";
+      params.push(year);
+    }
+
+    query += " ORDER BY timestamp DESC LIMIT 50";
+    const [rows] = await pool.execute(query, params);
+    return rows;
+  }
+
+  static async getRecentTransactions(planId, limit = 15) {
+    const year = planId ? (String(planId).includes('-') ? planId.split('-')[1] : planId) : new Date().getFullYear();
+
     const [rows] = await pool.query(`
       SELECT
         id,
@@ -63,7 +81,7 @@ class DashboardService {
         created_at as date,
         purpose as description
       FROM pr_so
-      WHERE is_deleted = 0
+      WHERE is_deleted = 0 AND YEAR(created_at) = ?
       UNION ALL
       SELECT
         id,
@@ -74,10 +92,10 @@ class DashboardService {
         transaction_date as date,
         particular as description
       FROM obligation
-      WHERE is_deleted = 0
+      WHERE is_deleted = 0 AND YEAR(transaction_date) = ?
       ORDER BY date DESC
       LIMIT ?
-    `, [limit]);
+    `, [year, year, limit]);
     return rows;
   }
 }

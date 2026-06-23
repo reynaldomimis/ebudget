@@ -20,8 +20,8 @@ export const BudgetProvider = ({ children }) => {
       const [execResponse, papResponse, auditResponse, transResponse] = await Promise.all([
         dashboardAPI.getExecutiveSummary(selectedYear),
         financialAPI.getPapSummary(selectedYear),
-        dashboardAPI.getAuditFeed(),
-        dashboardAPI.getRecentTransactions()
+        dashboardAPI.getAuditFeed(selectedYear),
+        dashboardAPI.getRecentTransactions(selectedYear)
       ]);
 
       if (execResponse.success) setExecutiveSummary(execResponse.data);

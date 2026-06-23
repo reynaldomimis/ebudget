@@ -349,6 +349,29 @@ const AuditFeed = ({ logs, loading }) => {
   );
 };
 
+/* ─── Empty State Component ─────────────────────────────────── */
+const DashboardEmptyState = ({ year, onRefresh }) => (
+  <div className="flex flex-col items-center justify-center py-20 px-4 bg-white border border-slate-100 rounded-xl shadow-sm animate-in fade-in zoom-in duration-700">
+    <div className="w-20 h-20 bg-emerald-50 rounded-full flex items-center justify-center mb-6">
+      <ClipboardList size={40} className="text-emerald-500 opacity-40" />
+    </div>
+    <h3 className="text-lg font-black text-slate-900 uppercase tracking-tight mb-2">No Financial Data for FY {year}</h3>
+    <p className="text-slate-500 text-[11px] font-bold uppercase tracking-wider text-center max-w-md leading-relaxed mb-8">
+      The system couldn't find any allotment or transaction records for this fiscal year.
+      Please ensure you have uploaded the budget plan or selected the correct period.
+    </p>
+    <div className="flex gap-3">
+      <button
+        onClick={onRefresh}
+        className="px-6 py-2.5 bg-emerald-600 text-white rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-200 active:scale-95 flex items-center gap-2"
+      >
+        <RefreshCw size={14} />
+        Retry Sync
+      </button>
+    </div>
+  </div>
+);
+
 /* ─── Main Executive Dashboard ─────────────────────────────────── */
 const DashboardOverview = () => {
   const { executiveSummary, auditFeed, recentTransactions, loading, error, refreshBudgetData } = useBudget();
@@ -361,6 +384,10 @@ const DashboardOverview = () => {
     papComposition: [],
     workflow: {}
   };
+
+  const hasData = useMemo(() => {
+    return summary.totalBudget > 0 || (recentTransactions && recentTransactions.length > 0);
+  }, [summary, recentTransactions]);
 
   return (
     <div className="space-y-4 pb-12 animate-in fade-in slide-in-from-bottom-4 duration-1000">
@@ -402,58 +429,64 @@ const DashboardOverview = () => {
         </div>
       )}
 
-      {/* SECTION 1: KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard
-          title="Total Budget"
-          value={`₱${formatPHP(summary.totalBudget)}`}
-          subValue="Allocated Allotment"
-          icon={Wallet}
-          variant="primary"
-          loading={loading}
-        />
-        <StatCard
-          title="Total Obligated"
-          value={`₱${formatPHP(summary.totalObligated)}`}
-          subValue="Processed Ledger"
-          icon={ArrowDownToLine}
-          loading={loading}
-        />
-        <StatCard
-          title="Unobligated"
-          value={`₱${formatPHP(summary.remainingBudget)}`}
-          subValue="Available Fund"
-          icon={Clock}
-          loading={loading}
-        />
-        <StatCard
-          title="Utilization"
-          value={`${(summary.utilizationRate || 0).toFixed(1)}%` }
-          subValue="Absorption Rate"
-          icon={Activity}
-          loading={loading}
-        />
-      </div>
+      {!loading && !hasData && !error ? (
+        <DashboardEmptyState year={selectedYear} onRefresh={refreshBudgetData} />
+      ) : (
+        <>
+          {/* SECTION 1: KPI Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <StatCard
+              title="Total Budget"
+              value={`₱${formatPHP(summary.totalBudget)}`}
+              subValue="Allocated Allotment"
+              icon={Wallet}
+              variant="primary"
+              loading={loading}
+            />
+            <StatCard
+              title="Total Obligated"
+              value={`₱${formatPHP(summary.totalObligated)}`}
+              subValue="Processed Ledger"
+              icon={ArrowDownToLine}
+              loading={loading}
+            />
+            <StatCard
+              title="Unobligated"
+              value={`₱${formatPHP(summary.remainingBudget)}`}
+              subValue="Available Fund"
+              icon={Clock}
+              loading={loading}
+            />
+            <StatCard
+              title="Utilization"
+              value={`${(summary.utilizationRate || 0).toFixed(1)}%` }
+              subValue="Absorption Rate"
+              icon={Activity}
+              loading={loading}
+            />
+          </div>
 
-      {/* SECTION 2: PS Summary & MOOE Summary */}
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 items-stretch">
-        <div className="lg:col-span-2">
-          <FYSummaryTable summary={summary} loading={loading} title="PS Summary" variant="PS" />
-        </div>
-        <div className="lg:col-span-3">
-          <FYSummaryTable summary={summary} loading={loading} title="MOOE Summary" variant="FY" />
-        </div>
-      </div>
+          {/* SECTION 2: PS Summary & MOOE Summary */}
+          <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 items-stretch">
+            <div className="lg:col-span-2">
+              <FYSummaryTable summary={summary} loading={loading} title="PS Summary" variant="PS" />
+            </div>
+            <div className="lg:col-span-3">
+              <FYSummaryTable summary={summary} loading={loading} title="MOOE Summary" variant="FY" />
+            </div>
+          </div>
 
-      {/* SECTION 3: Live Audit & Transactions */}
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 items-stretch">
-        <div className="lg:col-span-3">
-          <RecentTransactionsTable transactions={recentTransactions} loading={loading} />
-        </div>
-        <div className="lg:col-span-2">
-          <AuditFeed logs={auditFeed} loading={loading} />
-        </div>
-      </div>
+          {/* SECTION 3: Live Audit & Transactions */}
+          <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 items-stretch">
+            <div className="lg:col-span-3">
+              <RecentTransactionsTable transactions={recentTransactions} loading={loading} />
+            </div>
+            <div className="lg:col-span-2">
+              <AuditFeed logs={auditFeed} loading={loading} />
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 };

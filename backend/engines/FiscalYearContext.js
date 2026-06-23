@@ -50,7 +50,13 @@ class FiscalYearContext {
       return plans[0].plan_id;
     }
 
-    // Fallback to active plan if year not found
+    // If input looks like a fiscal year (e.g., "2023"), return it as is
+    // so engines can filter by that year (returning empty results instead of falling back to 2026)
+    if (/^20\d{2}$/.test(String(input))) {
+      return String(input);
+    }
+
+    // Fallback to active plan only if input is null or unrecognized
     return await this.getActivePlanId();
   }
 }

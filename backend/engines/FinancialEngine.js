@@ -60,7 +60,7 @@ class FinancialEngine {
       [year]
     );
 
-    // 3. Get Workflow Counts (Still needed from PR table)
+    // 3. Get Workflow Counts (Filtered by Year)
     const [countRows] = await pool.query(`
       SELECT
         SUM(CASE WHEN workflow_status = 'Draft' THEN 1 ELSE 0 END) as draft,
@@ -70,8 +70,8 @@ class FinancialEngine {
         SUM(CASE WHEN workflow_status = 'Obligated' THEN 1 ELSE 0 END) as obligated,
         SUM(CASE WHEN workflow_status = 'Rejected' THEN 1 ELSE 0 END) as rejected
       FROM pr_so
-      WHERE is_deleted = 0
-    `);
+      WHERE is_deleted = 0 AND YEAR(created_at) = ?
+    `, [year]);
 
     const totals = programRows.reduce((acc, row) => {
       acc.psTotal += Number(row.total_ps || 0);

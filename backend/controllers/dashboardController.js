@@ -15,12 +15,9 @@ class DashboardController {
 
   static async getAuditFeed(req, res) {
     try {
-      const [rows] = await pool.execute(`
-        SELECT * FROM audit_logs
-        ORDER BY timestamp DESC
-        LIMIT 50
-      `);
-      res.json({ success: true, data: rows });
+      const { plan_id } = req.query;
+      const data = await DashboardService.getAuditFeed(plan_id);
+      res.json({ success: true, data });
     } catch (error) {
       res.status(500).json({ success: false, error: error.message });
     }
@@ -28,7 +25,8 @@ class DashboardController {
 
   static async getRecentTransactions(req, res) {
     try {
-      const data = await DashboardService.getRecentTransactions(15);
+      const { plan_id } = req.query;
+      const data = await DashboardService.getRecentTransactions(plan_id, 15);
       res.json({ success: true, data });
     } catch (error) {
       res.status(500).json({ success: false, error: error.message });
