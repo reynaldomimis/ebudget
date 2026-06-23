@@ -710,12 +710,6 @@ const ImportCenter = () => {
         title="Confirm Allotment Registration"
         initialAllotmentType={importType}
       />
-
-      <div className="flex justify-center mt-12 pb-20">
-        <button className="flex items-center gap-3 text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 hover:text-emerald-600 transition-all group">
-          <History size={16} /> View Full Import History
-        </button>
-      </div>
     </div>
   );
 };

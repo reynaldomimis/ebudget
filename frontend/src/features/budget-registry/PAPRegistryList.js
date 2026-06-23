@@ -210,9 +210,11 @@ const PAPRegistryList = () => {
             >
               <RefreshCw size={16} className={`${refreshing ? 'animate-spin' : ''} text-emerald-600`} />
             </button>
-            <button className="flex items-center gap-2 px-6 py-2.5 bg-emerald-600 text-white rounded-lg text-[10px] font-black uppercase tracking-widest shadow-lg shadow-emerald-900/20 hover:bg-emerald-700 transition-all active:scale-95">
-               <Download size={14} /> Export Registry
-            </button>
+            {programs.length > 0 && (
+              <button className="flex items-center gap-2 px-6 py-2.5 bg-emerald-600 text-white rounded-lg text-[10px] font-black uppercase tracking-widest shadow-lg shadow-emerald-900/20 hover:bg-emerald-700 transition-all active:scale-95 animate-in fade-in zoom-in-95 duration-300">
+                 <Download size={14} /> Export Registry
+              </button>
+            )}
           </div>
         }
       />
