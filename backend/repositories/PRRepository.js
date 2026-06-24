@@ -2,12 +2,13 @@ const { pool } = require("../config/database");
 
 class PRRepository {
   static async create(prData, connection = pool) {
-    const query = `INSERT INTO pr_so (mooe_id, prno, amount, purpose) VALUES (?, ?, ?, ?)`;
+    const query = `INSERT INTO pr_so (mooe_id, prno, amount, purpose, workflow_status) VALUES (?, ?, ?, ?, ?)`;
     const [result] = await connection.execute(query, [
       prData.mooe_id,
       prData.prno,
       prData.amount,
-      prData.purpose
+      prData.purpose,
+      prData.workflow_status || 'Draft'
     ]);
     return result;
   }
@@ -25,34 +26,6 @@ class PRRepository {
         item.total
       ]);
     }
-  }
-
-  static async getAll() {
-    const query = "SELECT * FROM vw_pr_details ORDER BY created_at DESC";
-    const [rows] = await pool.execute(query);
-    return rows;
-  }
-
-  static async getById(id) {
-    const [rows] = await pool.execute("SELECT * FROM vw_pr_details WHERE id = ?", [id]);
-    return rows[0];
-  }
-
-  static async getByPRNo(prno, connection = pool) {
-    const [rows] = await connection.execute("SELECT * FROM vw_pr_details WHERE prno = ?", [prno]);
-    return rows[0];
-  }
-
-  static async getByMOOEId(mooeId) {
-    let query = `SELECT * FROM vw_pr_details`;
-    const values = [];
-    if (mooeId) {
-        query += " WHERE mooe_id = ?";
-        values.push(mooeId);
-    }
-    query += " ORDER BY created_at DESC";
-    const [rows] = await pool.execute(query, values);
-    return rows;
   }
 
   static async update(id, prData, connection = pool) {
@@ -90,20 +63,10 @@ class PRRepository {
     await connection.execute("DELETE FROM pr_items WHERE pr_id = ?", [prId]);
   }
 
-  static async getItems(prId) {
-    const [rows] = await pool.execute("SELECT * FROM pr_items WHERE pr_id = ?", [prId]);
-    return rows;
-  }
-
   static async delete(id, connection = pool) {
     const query = "UPDATE pr_so SET is_deleted = 1, deleted_at = CURRENT_TIMESTAMP WHERE id = ?";
     const [result] = await connection.execute(query, [id]);
     return result;
-  }
-
-  static async getWithBalances() {
-    const [rows] = await pool.execute("SELECT * FROM vw_pr_details");
-    return rows;
   }
 }
 

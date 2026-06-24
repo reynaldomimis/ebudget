@@ -24,25 +24,6 @@ class ObligationController {
     }
   }
 
-  static async getAll(req, res) {
-    try {
-      const data = await ObligationService.getAllObligations();
-      res.json({ success: true, data });
-    } catch (error) {
-      handleError(error, res);
-    }
-  }
-
-  static async getByActivitiesId(req, res) {
-    try {
-      const { id } = req.query;
-      const data = await ObligationService.getObligationsByActivity(id);
-      res.json({ success: true, data });
-    } catch (error) {
-      handleError(error, res);
-    }
-  }
-
   static async update(req, res) {
     try {
       const { id } = req.params;

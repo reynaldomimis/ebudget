@@ -1,19 +1,21 @@
 import React from 'react';
 
-const inputBaseClasses = "w-full rounded-xl border border-neutral-200 px-4 text-sm font-bold text-neutral-800 transition-all outline-none focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 disabled:opacity-50 disabled:bg-neutral-50 placeholder:text-neutral-300 caret-emerald-600";
+const inputBaseClasses = "w-full rounded-xl border border-neutral-200 px-4 text-sm font-bold text-neutral-800 transition-all outline-none focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 disabled:opacity-50 disabled:bg-neutral-50 disabled:cursor-not-allowed placeholder:text-neutral-300 caret-emerald-600";
 const heightClass = "min-h-[48px]";
 
-export const Input = ({ className = "", ...props }) => (
+export const Input = ({ className = "", disabled, ...props }) => (
   <input
-    className={`${inputBaseClasses} ${heightClass} cursor-text ${className}`}
+    disabled={disabled}
+    className={`${inputBaseClasses} ${heightClass} ${disabled ? 'cursor-not-allowed' : 'cursor-text'} ${className}`}
     {...props}
   />
 );
 
-export const Select = ({ className = "", children, ...props }) => (
+export const Select = ({ className = "", children, disabled, ...props }) => (
   <div className="relative w-full">
     <select
-      className={`${inputBaseClasses} ${heightClass} appearance-none pr-10 cursor-pointer ${className}`}
+      disabled={disabled}
+      className={`${inputBaseClasses} ${heightClass} appearance-none pr-10 ${disabled ? 'cursor-not-allowed' : 'cursor-pointer'} ${className}`}
       {...props}
     >
       {children}
@@ -26,9 +28,10 @@ export const Select = ({ className = "", children, ...props }) => (
   </div>
 );
 
-export const Textarea = ({ className = "", ...props }) => (
+export const Textarea = ({ className = "", disabled, ...props }) => (
   <textarea
-    className={`${inputBaseClasses} py-3 min-h-[100px] cursor-text ${className}`}
+    disabled={disabled}
+    className={`${inputBaseClasses} py-3 min-h-[100px] ${disabled ? 'cursor-not-allowed' : 'cursor-text'} ${className}`}
     {...props}
   />
 );

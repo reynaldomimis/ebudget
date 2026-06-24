@@ -12,7 +12,7 @@ class FiscalYearRepository {
   }
 
   static async getByYear(year) {
-    const [rows] = await pool.execute("SELECT * FROM plan_info WHERE year = ?", [year]);
+    const [rows] = await pool.execute("SELECT * FROM plan_info WHERE year = ? ORDER BY created_at DESC", [year]);
     return rows;
   }
 

@@ -3,22 +3,36 @@ import PRList from './PRList';
 import CreatePR from './CreatePR';
 
 const ProcurementRequests = () => {
-  const [view, setView] = useState('list');
+  const [view, setView] = useState('list'); // 'list' or 'form'
+  const [editId, setEditId] = useState(null);
 
   const handleCreateClick = () => {
-    setView('create');
+    setEditId(null);
+    setView('form');
   };
 
-  const handleCancelCreate = () => {
+  const handleEditClick = (id) => {
+    setEditId(id);
+    setView('form');
+  };
+
+  const handleCloseForm = () => {
+    setEditId(null);
     setView('list');
   };
 
   return (
     <div className="p-6 max-w-[1600px] mx-auto">
       {view === 'list' ? (
-        <PRList onCreateClick={handleCreateClick} />
+        <PRList
+          onCreateClick={handleCreateClick}
+          onEditClick={handleEditClick}
+        />
       ) : (
-        <CreatePR onCancel={handleCancelCreate} />
+        <CreatePR
+          onCancel={handleCloseForm}
+          editId={editId}
+        />
       )}
     </div>
   );

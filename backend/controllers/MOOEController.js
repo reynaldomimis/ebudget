@@ -28,40 +28,6 @@ class MOOEController {
     }
   }
 
-  static async getAll(req, res) {
-    try {
-      const filters = req.query;
-      if (!filters.plan_id) {
-          filters.plan_id = await FiscalYearContext.getActivePlanId('MOOE');
-      }
-      const data = await MOOEService.getAllMOOE(filters);
-      res.json({ success: true, data });
-    } catch (error) {
-      handleError(error, res);
-    }
-  }
-
-  static async getById(req, res) {
-    try {
-      const { id } = req.params;
-      const data = await MOOEService.getMOOEById(id);
-      if (!data) return res.status(404).json({ success: false, message: "MOOE item not found" });
-
-      const BalanceEngine = require("../engines/BalanceEngine");
-      const availableAllocation = await BalanceEngine.getAvailableAllocation(id);
-
-      res.json({
-        success: true,
-        data: {
-          ...data,
-          availableAllocation
-        }
-      });
-    } catch (error) {
-      handleError(error, res);
-    }
-  }
-
   static async update(req, res) {
     try {
       const { id } = req.params;
@@ -87,22 +53,6 @@ class MOOEController {
       const { planId } = req.params;
       await MOOEService.deleteByPlanId(planId);
       res.json({ success: true, message: "MOOE items for plan deleted successfully" });
-    } catch (error) {
-      handleError(error, res);
-    }
-  }
-
-  static async getDistinctValues(req, res) {
-    try {
-      const { field } = req.params;
-      const filters = req.query;
-
-      if (!filters.plan_id) {
-          filters.plan_id = await FiscalYearContext.getActivePlanId('MOOE');
-      }
-
-      const data = await MOOEService.getDistinctValues(field, filters);
-      res.json({ success: true, data });
     } catch (error) {
       handleError(error, res);
     }

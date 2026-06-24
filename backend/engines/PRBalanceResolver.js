@@ -4,10 +4,11 @@ const AuditEngine = require("./AuditEngine");
 
 class PRBalanceResolver {
   static async resolvePRStatus(prno, connection) {
-    const pr = await PRRepository.getByPRNo(prno, connection);
+    const { pool } = require("../config/database");
+    const [prRows] = await (connection || pool).execute("SELECT id, workflow_status, remaining_balance, pr_amount FROM vw_pr_details WHERE prno = ?", [prno]);
+    const pr = prRows[0];
     if (!pr) return null;
 
-    // We only auto-transition from Approved/Partially Obligated/Obligated
     const dynamicStatuses = ['Approved', 'Partially Obligated', 'Obligated'];
     if (!dynamicStatuses.includes(pr.workflow_status)) {
         return {

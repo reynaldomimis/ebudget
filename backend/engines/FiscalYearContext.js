@@ -16,13 +16,13 @@ class FiscalYearContext {
 
     for (const plan of plans) {
         if (type === 'MOOE') {
-            // Check if this plan has MOOE data
+            // Check if this plan has MOOE data using the view
             const { pool } = require("../config/database");
-            const [rows] = await pool.execute("SELECT 1 FROM mooe WHERE plan_id = ? LIMIT 1", [plan.plan_id]);
+            const [rows] = await pool.execute("SELECT 1 FROM vw_mooe_excel_full_report WHERE plan_id = ? LIMIT 1", [plan.plan_id]);
             if (rows.length > 0) return plan.plan_id;
         } else if (type === 'PS') {
             const { pool } = require("../config/database");
-            const [rows] = await pool.execute("SELECT 1 FROM ps WHERE plan_id = ? LIMIT 1", [plan.plan_id]);
+            const [rows] = await pool.execute("SELECT 1 FROM vw_ps_details WHERE plan_id = ? LIMIT 1", [plan.plan_id]);
             if (rows.length > 0) return plan.plan_id;
         }
     }

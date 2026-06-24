@@ -3,7 +3,7 @@ import { Plus, Download, Search, Eye, Edit, RotateCcw } from "lucide-react";
 import PageHeader from "../../components/common/PageHeader";
 import DataTable from "../../components/common/DataTable";
 import Button from "../../components/common/Button";
-import { obligationAPI } from "../../services/api";
+import { obligationAPI, monitoringAPI } from "../../services/api";
 import { formatPHP } from "../../utils/formatters";
 
 const ObligationList = ({ onNavigate }) => {
@@ -18,7 +18,7 @@ const ObligationList = ({ onNavigate }) => {
   const fetchObligations = async () => {
     try {
       setLoading(true);
-      const res = await obligationAPI.getAll();
+      const res = await monitoringAPI.getObligations();
       if (res.success) setObData(res.data || []);
     } catch (err) {
       console.error("Failed to fetch obligations", err);

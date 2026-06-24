@@ -44,6 +44,26 @@ class MonitoringController {
       res.status(500).json({ success: false, error: error.message });
     }
   }
+
+  static async getPRs(req, res) {
+    try {
+      const { pool } = require("../config/database");
+      const [rows] = await pool.execute("SELECT * FROM vw_pr_details ORDER BY created_at DESC");
+      res.json({ success: true, data: rows });
+    } catch (error) {
+      res.status(500).json({ success: false, error: error.message });
+    }
+  }
+
+  static async getObligations(req, res) {
+    try {
+      const { pool } = require("../config/database");
+      const [rows] = await pool.execute("SELECT * FROM vw_obligation_details ORDER BY created_at DESC");
+      res.json({ success: true, data: rows });
+    } catch (error) {
+      res.status(500).json({ success: false, error: error.message });
+    }
+  }
 }
 
 module.exports = MonitoringController;

@@ -2,12 +2,19 @@ const { pool } = require("../config/database");
 const DataNormalizationEngine = require("./DataNormalizationEngine");
 
 class FilterEngine {
-  static async getDistinctValues(table, field, filters = {}) {
-    const allowedTables = ["mooe", "ps", "pr_so", "obligation", "vw_mooe_excel_full_report"];
-    const allowedFields = ["pap_type", "pap_des", "office", "activity", "object_group", "sub_object", "ref_main_name", "name", "expense_items", "expense_items_sub"];
+  static async getDistinctValues(viewName, field, filters = {}) {
+    const allowedViews = [
+        "vw_mooe_excel_full_report",
+        "vw_obligation_details",
+        "vw_pap_financial_summary",
+        "vw_pr_details",
+        "vw_pr_items_full",
+        "vw_program_financial_summary",
+        "vw_ps_details"
+    ];
 
-    if (!allowedTables.includes(table)) {
-      throw new Error(`Invalid table: ${table}`);
+    if (!allowedViews.includes(viewName)) {
+      throw new Error(`Invalid view: ${viewName}. Data fetching must strictly use approved views.`);
     }
 
     const fieldMap = {
@@ -18,12 +25,9 @@ class FilterEngine {
 
     const targetField = fieldMap[field] || field;
 
-    let targetTable = table;
-    if (table === 'mooe') targetTable = 'vw_mooe_excel_full_report';
-
-    // refactor: if field is pap_type or pap_des, we want the code and label combined
+    // Standardize result selection
     let selectClause = `DISTINCT ${targetField}`;
-    if (targetTable === "vw_mooe_excel_full_report") {
+    if (viewName === "vw_mooe_excel_full_report") {
         if (targetField === 'pap_type') selectClause = `DISTINCT CONCAT(pap_type_code, '|', pap_type) as result`;
         else if (targetField === 'pap_des') selectClause = `DISTINCT CONCAT(pap_des_code, '|', pap_des) as result`;
         else selectClause = `DISTINCT ${targetField} as result`;
@@ -31,27 +35,22 @@ class FilterEngine {
         selectClause = `DISTINCT ${targetField} as result`;
     }
 
-    let query = `SELECT ${selectClause} FROM ${targetTable} WHERE 1=1`;
-
-    if (targetTable !== "vw_mooe_excel_full_report") {
-        query += " AND is_deleted = 0";
-    }
+    let query = `SELECT ${selectClause} FROM ${viewName} WHERE 1=1`;
 
     const values = [];
 
-    if (targetTable === "vw_mooe_excel_full_report") {
-        query += " AND row_type = 'DETAIL' AND total_amount > 0";
+    if (viewName === "vw_mooe_excel_full_report") {
+        query += " AND row_type = 'DETAIL'";
     }
 
     Object.keys(filters).forEach(key => {
         let targetKey = fieldMap[key] || key;
         let filterValue = filters[key];
 
-        if (targetTable === "vw_mooe_excel_full_report") {
+        if (viewName === "vw_mooe_excel_full_report") {
             if (key === 'pap_type') targetKey = 'pap_type_code';
             if (key === 'pap_des') targetKey = 'pap_des_code';
 
-            // If the value passed is a combined "code|label", extract only the code
             if (String(filterValue).includes('|')) {
                 filterValue = filterValue.split('|')[0];
             }
@@ -63,7 +62,7 @@ class FilterEngine {
         }
     });
 
-    if (targetTable === "vw_mooe_excel_full_report") {
+    if (viewName === "vw_mooe_excel_full_report") {
         query += ` GROUP BY result ORDER BY MIN(report_order) ASC`;
     } else {
         query += ` ORDER BY result ASC`;
@@ -84,13 +83,20 @@ class FilterEngine {
         sub_object as expense_items_sub
       FROM vw_mooe_excel_full_report
       WHERE row_type = 'DETAIL'
-        AND total_amount > 0
+        AND object_group IS NOT NULL
+        AND object_group != ''
+        AND object_group != '-'
     `;
     const mooeValues = [];
 
     if (plan_id) {
-        mooeQuery += " AND plan_id = ?";
-        mooeValues.push(plan_id);
+        if (/^20\d{2}$/.test(String(plan_id))) {
+             mooeQuery += " AND plan_id LIKE ?";
+             mooeValues.push(`%${plan_id}%`);
+        } else {
+             mooeQuery += " AND plan_id = ?";
+             mooeValues.push(plan_id);
+        }
     }
 
     mooeQuery += " ORDER BY report_order ASC";
@@ -100,9 +106,14 @@ class FilterEngine {
     const hierarchy = {};
 
     mooeRows.forEach(row => {
-      // Create code-aware keys to prevent description-based mismatch
-      const typeKey = `${row.pap_type_code}|${row.pap_type}`;
-      const desKey = `${row.pap_des_code}|${row.pap_des}`;
+      const papTypeCode = row.pap_type_code || '00000';
+      const papType = row.pap_type || 'Uncategorized';
+      const typeKey = `${papTypeCode}|${papType}`;
+
+      const papDesCode = row.pap_des_code || '00000';
+      const papDes = row.pap_des || 'Unnamed PAP';
+      const desKey = `${papDesCode}|${papDes}`;
+
       const office = row.office || 'N/A';
       const name = row.name || 'General';
       const expense_items = row.expense_items || 'General';
@@ -127,10 +138,22 @@ class FilterEngine {
       });
     });
 
-    // PS Hierarchy remains distinct
-    const psRows = await pool.query("SELECT DISTINCT pap_type, pap_des FROM ps WHERE is_deleted = 0");
+    // PS Hierarchy
+    let psSql = "SELECT DISTINCT pap_type, pap_des FROM vw_ps_details";
+    const psValues = [];
+    if (plan_id) {
+        if (/^20\d{2}$/.test(String(plan_id))) {
+            psSql += " WHERE plan_id LIKE ?";
+            psValues.push(`%${plan_id}%`);
+        } else {
+            psSql += " WHERE plan_id = ?";
+            psValues.push(plan_id);
+        }
+    }
+
+    const [psRows] = await pool.execute(psSql, psValues);
     const psHierarchy = {};
-    psRows[0].forEach(r => {
+    psRows.forEach(r => {
         const type = r.pap_type;
         if (!psHierarchy[type]) psHierarchy[type] = [];
         psHierarchy[type].push(r.pap_des);

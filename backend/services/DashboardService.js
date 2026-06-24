@@ -76,12 +76,12 @@ class DashboardService {
         id,
         prno as reference,
         'PR' as type,
-        amount,
+        pr_amount as amount,
         workflow_status as status,
         created_at as date,
         purpose as description
-      FROM pr_so
-      WHERE is_deleted = 0 AND YEAR(created_at) = ?
+      FROM vw_pr_details
+      WHERE fiscal_year = ?
       UNION ALL
       SELECT
         id,
@@ -89,10 +89,10 @@ class DashboardService {
         'OBLIGATION' as type,
         amount,
         'Obligated' as status,
-        transaction_date as date,
+        created_at as date,
         particular as description
-      FROM obligation
-      WHERE is_deleted = 0 AND YEAR(transaction_date) = ?
+      FROM vw_obligation_details
+      WHERE fiscal_year = ?
       ORDER BY date DESC
       LIMIT ?
     `, [year, year, limit]);

@@ -18,8 +18,9 @@ class ValidationEngine {
       throw new AppError("INVALID_OPERATION", "Purchase Requests are not allowed for Personal Services (PS) allotment.");
     }
 
-    const mooe = await MOOERepository.getById(allotmentId);
-    if (!mooe) throw new AppError("MOOE_NOT_FOUND", "MOOE record not found", {}, 404);
+    const { pool } = require("../config/database");
+    const [mooeRows] = await pool.query("SELECT id FROM vw_mooe_excel_full_report WHERE id = ?", [allotmentId]);
+    if (mooeRows.length === 0) throw new AppError("MOOE_NOT_FOUND", "MOOE record not found", {}, 404);
 
     const available = await BalanceEngine.getAvailableAllocation(allotmentId);
 
@@ -31,9 +32,11 @@ class ValidationEngine {
 
   static async validateObligationCreation(data) {
     const { amount, prno, mooe_id, ps_id } = data;
+    const { pool } = require("../config/database");
 
     if (prno) {
-      const pr = await PRRepository.getByPRNo(prno);
+      const [prRows] = await pool.query("SELECT workflow_status FROM vw_pr_details WHERE prno = ?", [prno]);
+      const pr = prRows[0];
       if (!pr) throw new AppError("PR_NOT_FOUND", "Purchase Request not found");
 
       const allowedStatuses = ['Approved', 'Partially Obligated'];

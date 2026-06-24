@@ -5,7 +5,7 @@ import DataTable from '../../components/common/DataTable';
 import Button from '../../components/common/Button';
 import StatusBadge from '../../components/common/StatusBadge';
 import EmptyState from '../../components/common/EmptyState';
-import { obligationAPI } from '../../services/api';
+import { obligationAPI, monitoringAPI } from '../../services/api';
 import { formatPHP } from '../../utils/formatters';
 
 const ObligationList = ({ onCreateClick }) => {
@@ -20,7 +20,7 @@ const ObligationList = ({ onCreateClick }) => {
   const fetchObligations = async () => {
     try {
       setLoading(true);
-      const res = await obligationAPI.getAll();
+      const res = await monitoringAPI.getObligations();
       if (res.success) setObData(res.data);
     } catch (err) {
       console.error("Failed to fetch obligations", err);

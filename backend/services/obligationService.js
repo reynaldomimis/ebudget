@@ -19,7 +19,7 @@ class ObligationService {
 
       // Fetch mooe_id and pr_id if it's a PR obligation
       if (obligationData.prno && (!obligationData.mooe_id || !obligationData.pr_id)) {
-        const [pr] = await connection.execute("SELECT id, mooe_id FROM pr_so WHERE prno = ?", [obligationData.prno]);
+        const [pr] = await connection.execute("SELECT id, mooe_id FROM vw_pr_details WHERE prno = ?", [obligationData.prno]);
         if (pr && pr.length > 0) {
           if (!obligationData.pr_id) obligationData.pr_id = pr[0].id;
           if (!obligationData.mooe_id) obligationData.mooe_id = pr[0].mooe_id;
@@ -48,18 +48,9 @@ class ObligationService {
     });
   }
 
-  static async getAllObligations() {
-    return await ObligationRepository.getAll();
-  }
-
-  static async getObligationsByActivity(activityId) {
-    return await ObligationRepository.getByActivityId(activityId);
-  }
-
   static async updateObligation(id, obligationData) {
      return await TransactionEngine.execute(async (connection) => {
-      // Get old prno to handle status re-resolution if prno changed
-      const oldOb = await connection.execute("SELECT prno FROM obligation WHERE id = ?", [id]);
+      const oldOb = await connection.execute("SELECT prno FROM vw_obligation_details WHERE id = ?", [id]);
       const oldPrNo = oldOb[0] && oldOb[0][0] ? oldOb[0][0].prno : null;
 
       const result = await ObligationRepository.update(id, obligationData, connection);
@@ -80,7 +71,7 @@ class ObligationService {
 
   static async deleteObligation(id) {
     return await TransactionEngine.execute(async (connection) => {
-      const [ob] = await connection.execute("SELECT prno FROM obligation WHERE id = ?", [id]);
+      const [ob] = await connection.execute("SELECT prno FROM vw_obligation_details WHERE id = ?", [id]);
       const prno = ob && ob[0] ? ob[0].prno : null;
 
       const result = await ObligationRepository.delete(id, connection);

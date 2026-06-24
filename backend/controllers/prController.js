@@ -16,19 +16,20 @@ class PrController {
     }
   }
 
-  static async getAll(req, res) {
+  static async getById(req, res) {
     try {
-      const data = await PRService.getAllPRs();
-      res.json({ success: true, data });
-    } catch (error) {
-      handleError(error, res);
-    }
-  }
+      const { id } = req.params;
+      const { pool } = require("../config/database");
 
-  static async getByMOOEId(req, res) {
-    try {
-      const data = await PRService.getPRsByMOOE(req.params.id || req.query.id);
-      res.json({ success: true, data });
+      const [header] = await pool.execute("SELECT * FROM vw_pr_details WHERE id = ?", [id]);
+      if (header.length === 0) return res.status(404).json({ success: false, message: "PR not found" });
+
+      const [items] = await pool.execute("SELECT * FROM pr_items WHERE pr_id = ?", [id]);
+
+      res.json({
+        success: true,
+        data: { ...header[0], items }
+      });
     } catch (error) {
       handleError(error, res);
     }
@@ -59,25 +60,6 @@ class PrController {
       const { year, month } = req.query;
       const nextPrNo = await SequenceEngine.getNextPRNo(year, month);
       res.json({ success: true, nextPrNo, year, month });
-    } catch (error) {
-      handleError(error, res);
-    }
-  }
-
-  static async getWithBalance(req, res) {
-    try {
-      const data = await PRService.getPRWithBalance();
-      res.json({ success: true, data });
-    } catch (error) {
-      handleError(error, res);
-    }
-  }
-
-  static async getByRecordsId(req, res) {
-    try {
-      const { id } = req.params;
-      const data = await PRService.getPRById(id);
-      res.json({ success: true, data });
     } catch (error) {
       handleError(error, res);
     }

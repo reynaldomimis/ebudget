@@ -27,19 +27,6 @@ class PSController {
     }
   }
 
-  static async getAll(req, res) {
-    try {
-      const filters = req.query;
-      if (!filters.plan_id) {
-        filters.plan_id = await FiscalYearContext.getActivePlanId();
-      }
-      const data = await PSService.getAllPS(filters);
-      res.json({ success: true, data });
-    } catch (error) {
-      handleError(error, res);
-    }
-  }
-
   static async update(req, res) {
     try {
       const { id } = req.params;
@@ -55,16 +42,6 @@ class PSController {
       const { id } = req.params;
       await PSService.deletePS(id);
       res.json({ success: true, message: "PS item deleted successfully" });
-    } catch (error) {
-      handleError(error, res);
-    }
-  }
-
-  static async getDistinctValues(req, res) {
-    try {
-      const { field } = req.params;
-      const data = await PSService.getDistinctValues(field);
-      res.json({ success: true, data });
     } catch (error) {
       handleError(error, res);
     }

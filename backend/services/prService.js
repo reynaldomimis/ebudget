@@ -34,18 +34,11 @@ class PRService {
       CacheEngine.invalidate("exec_summary");
       CacheEngine.invalidate("ai_context");
 
-      await AuditEngine.log("PR_CREATED", { prId, prno: prData.prno, amount: prData.amount }, null, 'PR', prId);
+      const action = prData.workflow_status === 'For Review' ? 'PR_SUBMITTED' : 'PR_CREATED';
+      await AuditEngine.log(action, { prId, prno: prData.prno, amount: prData.amount }, null, 'PR', prId);
 
       return result;
     });
-  }
-
-  static async getAllPRs() {
-    return await PRRepository.getAll();
-  }
-
-  static async getPRsByMOOE(mooeId) {
-    return await PRRepository.getByMOOEId(mooeId);
   }
 
   static async updatePR(id, prData) {
@@ -82,21 +75,12 @@ class PRService {
     return result;
   }
 
-  static async getPRWithBalance() {
-    return await PRRepository.getWithBalances();
-  }
-
-  static async getPRById(id) {
-    const header = await PRRepository.getById(id);
-    if (!header) return null;
-
-    const items = await PRRepository.getItems(id);
-    return { ...header, items };
-  }
-
   static async submitPR(id, userId = null) {
     return await TransactionEngine.execute(async (connection) => {
-      const pr = await PRRepository.getById(id);
+      const { pool } = require("../config/database");
+      const [rows] = await pool.execute("SELECT workflow_status, prno FROM vw_pr_details WHERE id = ?", [id]);
+      const pr = rows[0];
+
       if (!pr) throw new Error("PR not found");
       if (pr.workflow_status !== "Draft" && pr.workflow_status !== "Rejected") {
         throw new Error(`Invalid transition from ${pr.workflow_status} to For Review`);
@@ -112,7 +96,10 @@ class PRService {
 
   static async approvePR(id, userId = null) {
     return await TransactionEngine.execute(async (connection) => {
-      const pr = await PRRepository.getById(id);
+      const { pool } = require("../config/database");
+      const [rows] = await pool.execute("SELECT workflow_status, prno FROM vw_pr_details WHERE id = ?", [id]);
+      const pr = rows[0];
+
       if (!pr) throw new Error("PR not found");
       if (pr.workflow_status !== "For Review") {
         throw new Error(`Invalid transition from ${pr.workflow_status} to Approved`);
@@ -128,7 +115,10 @@ class PRService {
 
   static async rejectPR(id, remarks, userId = null) {
     return await TransactionEngine.execute(async (connection) => {
-      const pr = await PRRepository.getById(id);
+      const { pool } = require("../config/database");
+      const [rows] = await pool.execute("SELECT workflow_status, prno FROM vw_pr_details WHERE id = ?", [id]);
+      const pr = rows[0];
+
       if (!pr) throw new Error("PR not found");
       if (pr.workflow_status !== "For Review") {
         throw new Error(`Invalid transition from ${pr.workflow_status} to Rejected`);

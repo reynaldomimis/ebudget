@@ -27,17 +27,6 @@ class MOOEService {
     });
   }
 
-  static async getAllMOOE(filters) {
-    if (filters.plan_id) {
-       return await MOOERepository.getByPlan(filters.plan_id, filters);
-    }
-    return await MOOERepository.getByPlan(null, filters);
-  }
-
-  static async getMOOEById(id) {
-    return await MOOERepository.getById(id);
-  }
-
   static async updateMOOE(id, data) {
     const result = await MOOERepository.update(id, data);
     const CacheEngine = require("../engines/CacheEngine");
@@ -58,11 +47,6 @@ class MOOEService {
     const result = await MOOERepository.deleteByPlan(planId);
     await AuditEngine.log("MOOE_PLAN_DELETED", { planId });
     return result;
-  }
-
-  static async getDistinctValues(field, filters = {}) {
-    const FilterEngine = require("../engines/FilterEngine");
-    return await FilterEngine.getDistinctValues("mooe", field, filters);
   }
 }
 

@@ -5,22 +5,30 @@ import DataTable from '../../components/common/DataTable';
 import Button from '../../components/common/Button';
 import StatusBadge from '../../components/common/StatusBadge';
 import EmptyState from '../../components/common/EmptyState';
-import { prAPI } from '../../services/api';
+import { prAPI, monitoringAPI } from '../../services/api';
 import { formatPHP } from '../../utils/formatters';
+import PRDetailsModal from './PRDetailsModal';
 
-const PRList = ({ onCreateClick }) => {
+const PRList = ({ onCreateClick, onEditClick }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
   const [prData, setPrData] = useState([]);
+  const [selectedPrId, setSelectedPrId] = useState(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   useEffect(() => {
     fetchPRs();
   }, []);
 
+  const handleViewDetails = (id) => {
+    setSelectedPrId(id);
+    setIsModalOpen(true);
+  };
+
   const fetchPRs = async () => {
     try {
       setLoading(true);
-      const res = await prAPI.getAll();
+      const res = await monitoringAPI.getPRs();
       if (res.success) setPrData(res.data);
     } catch (err) {
       console.error("Failed to fetch PRs", err);
@@ -37,8 +45,8 @@ const PRList = ({ onCreateClick }) => {
     },
     {
       header: 'DATE',
-      accessor: 'transaction_date',
-      render: (row) => <span className="text-neutral-600 text-[12px]">{row.transaction_date ? new Date(row.transaction_date).toLocaleDateString() : 'N/A'}</span>
+      accessor: 'created_at',
+      render: (row) => <span className="text-neutral-600 text-[12px]">{row.created_at ? new Date(row.created_at).toLocaleDateString() : 'N/A'}</span>
     },
     {
       header: 'PURPOSE',
@@ -82,10 +90,18 @@ const PRList = ({ onCreateClick }) => {
       accessor: 'id',
       render: (row) => (
         <div className="flex gap-1 justify-center">
-          <button className="p-1.5 hover:bg-neutral-100 rounded text-neutral-400 hover:text-primary-600 transition-colors" title="View Details">
+          <button
+            onClick={() => handleViewDetails(row.id)}
+            className="p-1.5 hover:bg-neutral-100 rounded text-neutral-400 hover:text-primary-600 transition-colors"
+            title="View Details"
+          >
             <Eye size={16} />
           </button>
-          <button className="p-1.5 hover:bg-neutral-100 rounded text-neutral-400 hover:text-primary-600 transition-colors" title="Edit Draft">
+          <button
+            onClick={() => onEditClick(row.id)}
+            className="p-1.5 hover:bg-neutral-100 rounded text-neutral-400 hover:text-primary-600 transition-colors"
+            title="Edit Draft"
+          >
             <Edit size={16} />
           </button>
         </div>
@@ -105,7 +121,7 @@ const PRList = ({ onCreateClick }) => {
     const headers = ["PR No", "Date", "Purpose", "Amount", "Obligated", "Balance", "Status"];
     const rows = filtered.map(pr => [
       pr.prno,
-      new Date(pr.transaction_date).toLocaleDateString(),
+      new Date(pr.created_at).toLocaleDateString(),
       pr.purpose,
       pr.pr_amount,
       pr.obligated_amount,
@@ -174,6 +190,12 @@ const PRList = ({ onCreateClick }) => {
       ) : (
         <EmptyState message="No purchase request records found in this period." />
       )}
+
+      <PRDetailsModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        prId={selectedPrId}
+      />
     </div>
   );
 };

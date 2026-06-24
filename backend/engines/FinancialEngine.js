@@ -69,8 +69,8 @@ class FinancialEngine {
         SUM(CASE WHEN workflow_status = 'Partially Obligated' THEN 1 ELSE 0 END) as partiallyObligated,
         SUM(CASE WHEN workflow_status = 'Obligated' THEN 1 ELSE 0 END) as obligated,
         SUM(CASE WHEN workflow_status = 'Rejected' THEN 1 ELSE 0 END) as rejected
-      FROM pr_so
-      WHERE is_deleted = 0 AND YEAR(created_at) = ?
+      FROM vw_pr_details
+      WHERE fiscal_year = ?
     `, [year]);
 
     const totals = programRows.reduce((acc, row) => {
@@ -128,33 +128,33 @@ class FinancialEngine {
     const all = await this.getPapDescriptionSummary(plan_id);
     const pap = all.find(p => p.pap_des === pap_des);
 
-    const mooeItems = (await MOOERepository.getByPlan(plan_id, { pap_des })) || [];
-    const psRecords = (await PSRepository.getAll({ plan_id, pap_des })) || [];
-    const allObligations = (await ObligationRepository.getAll()) || [];
-    const allPRs = (await PRRepository.getAll()) || [];
+    const [mooeItems] = await pool.query("SELECT * FROM vw_mooe_excel_full_report WHERE (plan_id = ? OR plan_year = ?) AND pap_des = ?", [plan_id, plan_id, pap_des]);
+    const [psRecords] = await pool.query("SELECT * FROM vw_ps_details WHERE (plan_id = ? OR fiscal_year = ?) AND pap_des = ?", [plan_id, plan_id, pap_des]);
+    const [allObligations] = await pool.query("SELECT * FROM vw_obligation_details");
+    const [allPRs] = await pool.query("SELECT * FROM vw_pr_details");
 
     const mooeIds = mooeItems.map(m => m.id);
     const psIds = psRecords.map(p => p.id);
-    const papObligations = allObligations.filter(o => (o.mooe_id && mooeIds.includes(o.mooe_id)) || (o.ps_id && psIds.includes(o.ps_id)));
+    const papObligations = allObligations.filter(o => (o.allotment_class === 'MOOE' && mooeIds.includes(o.id)) || (o.allotment_class === 'PS' && psIds.includes(o.id)));
 
     const offices = ["AD", "OED", "NPPD", "NSD", "NIED", "FMD"];
     const officeBreakdown = offices.map(off => {
       const offMOOE = mooeItems.filter(m => m.office === off);
-      const alloc = offMOOE.reduce((sum, m) => sum + Number(m.totalFq), 0);
+      const alloc = offMOOE.reduce((sum, m) => sum + Number(m.total_amount), 0);
       const offMooeIds = offMOOE.map(m => m.id);
-      const oblig = papObligations.filter(o => o.mooe_id && offMooeIds.includes(o.mooe_id)).reduce((sum, o) => sum + Number(o.amount), 0);
+      const oblig = papObligations.filter(o => o.allotment_class === 'MOOE' && offMooeIds.includes(o.id)).reduce((sum, o) => sum + Number(o.amount), 0);
       return { office: off, allocation: alloc, obligated: oblig, balance: alloc - oblig, utilization: alloc > 0 ? (oblig / alloc) * 100 : 0 };
     });
 
     return {
       summary: {
-        allocation: pap.total,
-        ps: pap.ps,
-        rlip: pap.rlip,
-        mooe: pap.mooe,
-        obligated: pap.obligated,
-        balance: pap.balance,
-        utilization: pap.utilization
+        allocation: pap ? pap.total : 0,
+        ps: pap ? pap.ps : 0,
+        rlip: pap ? pap.rlip : 0,
+        mooe: pap ? pap.mooe : 0,
+        obligated: pap ? pap.obligated : 0,
+        balance: pap ? pap.balance : 0,
+        utilization: pap ? pap.utilization : 0
       },
       officeBreakdown,
       prs: allPRs.filter(p => p.mooe_id && mooeIds.includes(p.mooe_id) && ['Approved', 'Partially Obligated', 'Obligated'].includes(p.workflow_status)),
@@ -164,27 +164,27 @@ class FinancialEngine {
 
   static async getBudgetRegistry(plan_id) {
     if (!plan_id) plan_id = await FiscalYearContext.getActivePlanId();
-    const mooeItems = (await MOOERepository.getByPlan(plan_id)) || [];
-    const psRecords = (await PSRepository.getAll({ plan_id })) || [];
-    const allPRs = (await PRRepository.getAll()) || [];
-    const allObligations = (await ObligationRepository.getAll()) || [];
+    const [mooeItems] = await pool.query("SELECT * FROM vw_mooe_excel_full_report WHERE plan_id = ? OR plan_year = ?", [plan_id, plan_id]);
+    const [psRecords] = await pool.query("SELECT * FROM vw_ps_details WHERE plan_id = ? OR fiscal_year = ?", [plan_id, plan_id]);
+    const [allPRs] = await pool.query("SELECT * FROM vw_pr_details");
+    const [allObligations] = await pool.query("SELECT * FROM vw_obligation_details");
     const registry = [];
 
     for (const item of mooeItems) {
-      if (item.is_subtotal) continue;
+      if (item.row_type === 'SUBTOTAL') continue;
       const prs = allPRs.filter(p => p.mooe_id === item.id);
       const prSummaries = prs.map(pr => {
         const obligations = allObligations.filter(o => o.prno === pr.prno);
         const obligated = obligations.reduce((sum, o) => sum + Number(o.amount), 0);
-        return { ...pr, obligated_amount: obligated, remaining_amount: Number(pr.amount) - obligated };
+        return { ...pr, obligated_amount: obligated, remaining_amount: Number(pr.pr_amount) - obligated };
       });
-      const directObligations = allObligations.filter(o => o.mooe_id === item.id && !o.prno);
+      const directObligations = allObligations.filter(o => o.allotment_class === 'MOOE' && o.id === item.id && !o.prno);
       const totalObligated = prSummaries.reduce((sum, p) => sum + p.obligated_amount, 0) + directObligations.reduce((sum, o) => sum + Number(o.amount), 0);
-      registry.push({ ...item, allotment_class: 'MOOE', prs: prSummaries, directObligations, totalObligated, remainingBalance: Number(item.totalFq) - totalObligated });
+      registry.push({ ...item, allotment_class: 'MOOE', prs: prSummaries, directObligations, totalObligated, remainingBalance: Number(item.total_amount) - totalObligated });
     }
 
     for (const record of psRecords) {
-      const directObligations = allObligations.filter(o => o.ps_id === record.id);
+      const directObligations = allObligations.filter(o => o.allotment_class === 'PS' && o.id === record.id);
       const totalObligated = directObligations.reduce((sum, o) => sum + Number(o.amount), 0);
       registry.push({ ...record, allotment_class: 'PS', prs: [], directObligations, totalObligated, remainingBalance: Number(record.amount) - totalObligated });
     }

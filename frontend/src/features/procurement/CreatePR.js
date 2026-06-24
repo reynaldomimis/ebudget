@@ -85,9 +85,9 @@ const CreatePR = ({ onNavigate }) => {
     const getBalance = async () => {
         if (selectedSubItem) {
             try {
-                const res = await mooeAPI.getById(selectedSubItem);
+                const res = await financialAPI.getBalance(selectedSubItem, 'MOOE');
                 if (res.success) {
-                    setAvailableBalance(res.data.availableAllocation);
+                    setAvailableBalance(res.data.balance);
                 }
             } catch (err) {
                 console.error("Balance fetch error:", err);

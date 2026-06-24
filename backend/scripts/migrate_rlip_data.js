@@ -16,7 +16,6 @@ async function migrate() {
     try {
         console.log("=== RLIP DATA MIGRATION ===");
 
-        // 1. Identify records that need fixing
         const [rows] = await pool.execute(`
             SELECT * FROM ps
             WHERE pap_des LIKE '%Retirement and Life Insurance Premiums%'

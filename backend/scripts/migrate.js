@@ -1,185 +1,234 @@
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '../.env') });
 const { pool } = require("../config/database");
 
-const migrate = async () => {
-  const connection = await pool.getConnection();
-  try {
-    console.log("Starting database hardening...");
+const views = [
+    `CREATE OR REPLACE VIEW vw_pap_financial_summary AS
+    SELECT
+        base.fiscal_year,
+        base.pap_type,
+        MAX(base.pap_type_code) AS pap_type_code,
+        base.pap_des_code,
 
-    // 1. Unique Constraints
-    console.log("Applying unique constraints...");
-    await connection.execute("ALTER TABLE pr_so MODIFY prno VARCHAR(100) UNIQUE");
-    await connection.execute("ALTER TABLE obligation MODIFY obrno VARCHAR(100) UNIQUE");
-    await connection.execute("ALTER TABLE plan_info MODIFY plan_id VARCHAR(100) PRIMARY KEY");
+        COALESCE(
+            MAX(CASE
+                WHEN base.pap_des_code = '100000100001000' THEN 'General Management and Supervision'
+                WHEN base.pap_des_code = '100000100002000' THEN 'Human Resource Development'
+                WHEN base.pap_des_code = '310100100001000' THEN 'Nutrition Policy, Standards, Plan and Program Development'
+                WHEN base.pap_des_code = '310100100002000' THEN 'Philippine Food and Nutrition Surveillance'
+                WHEN base.pap_des_code = '310100100003000' THEN 'Promotion of Good Nutrition'
+                WHEN base.pap_des_code = '310100100004000' THEN 'Assistance to National, Local Nutrition and Related Programs'
+            END),
+            MAX(base.pap_des),
+            'Unnamed PAP'
+        ) AS pap_description,
 
-    // 2. Index Optimization
-    console.log("Applying indexes...");
-    const indexes = [
-      "CREATE INDEX idx_activities_plan_id ON activities(plan_id)",
-      "CREATE INDEX idx_activities_plan_year ON activities(plan_year)",
-      "CREATE INDEX idx_activities_pap_type ON activities(pap_type)",
-      "CREATE INDEX idx_activities_allotment ON activities(allotment_class)",
-      "CREATE INDEX idx_ps_pap_type ON ps(pap_type)",
-      "CREATE INDEX idx_pr_so_activities_id ON pr_so(activities_id)",
-      "CREATE INDEX idx_obligation_prno ON obligation(prno)",
-      "CREATE INDEX idx_obligation_activities_id ON obligation(activities_id)"
-    ];
+        /* ALLOCATION SUMS */
+        SUM(CASE WHEN base.source = 'PS'   THEN base.amount ELSE 0 END) AS ps,
+        SUM(CASE WHEN base.source = 'RLIP' THEN base.amount ELSE 0 END) AS rlip,
+        SUM(CASE WHEN base.source = 'MOOE' THEN base.amount ELSE 0 END) AS mooe,
+        SUM(base.amount) AS total_allocation,
 
-    for (const sql of indexes) {
-      try {
-        await connection.execute(sql);
-      } catch (e) {
-        console.log(`Index already exists or failed: ${sql.split(' ').pop()}`);
-      }
-    }
+        /* OBLIGATED SUMS */
+        COALESCE((
+            SELECT SUM(o.amount)
+            FROM obligation o
+            LEFT JOIN mooe m ON o.mooe_id = m.id
+            LEFT JOIN ps p   ON o.ps_id = p.id
+            WHERE o.is_deleted = 0
+              AND (
+                  (m.pap_des_code = base.pap_des_code AND YEAR(m.created_at) = base.fiscal_year)
+                  OR
+                  (p.pap_des_code = base.pap_des_code AND YEAR(p.created_at) = base.fiscal_year)
+              )
+        ), 0) AS obligated,
 
-    // 3. Database Views
-    console.log("Creating optimized views...");
+        /* UNOBLIGATED */
+        (SUM(base.amount) - COALESCE((
+            SELECT SUM(o.amount)
+            FROM obligation o
+            LEFT JOIN mooe m ON o.mooe_id = m.id
+            LEFT JOIN ps p   ON o.ps_id = p.id
+            WHERE o.is_deleted = 0
+              AND (
+                  (m.pap_des_code = base.pap_des_code AND YEAR(m.created_at) = base.fiscal_year)
+                  OR
+                  (p.pap_des_code = base.pap_des_code AND YEAR(p.created_at) = base.fiscal_year)
+              )
+        ), 0)) AS unobligated
 
-    await connection.execute(`
-      CREATE OR REPLACE VIEW vw_pr_balances AS
-      SELECT
-        p.id,
-        p.prno,
-        p.created_at as transaction_date,
-        p.amount,
-        m.name,
-        m.expense_items,
-        m.expense_items_sub,
+    FROM (
+        SELECT YEAR(created_at) as fiscal_year, pap_type, pap_type_code, pap_des, pap_des_code, amount, 'PS' as source FROM ps WHERE is_deleted = 0
+        UNION ALL
+        SELECT YEAR(r.created_at) as fiscal_year, p.pap_type, p.pap_type_code, r.pap_des, r.pap_des_code, r.amount, 'RLIP' as source FROM rlip r JOIN ps p ON r.ps_id = p.id WHERE r.is_deleted = 0
+        UNION ALL
+        SELECT YEAR(created_at) as fiscal_year, pap_type, pap_type_code, pap_des, pap_des_code, totalFq as amount, 'MOOE' as source FROM mooe WHERE is_deleted = 0 AND is_subtotal = 0
+    ) base
+    GROUP BY base.fiscal_year, base.pap_des_code, base.pap_type;`,
+
+    `CREATE OR REPLACE VIEW vw_program_financial_summary AS
+    SELECT
+        fiscal_year,
+        pap_type_code,
+        MAX(pap_type) AS pap_type,
+        SUM(ps)                AS total_ps,
+        SUM(rlip)              AS total_rlip,
+        SUM(mooe)              AS total_mooe,
+        SUM(total_allocation)  AS grand_total_allocation,
+        SUM(obligated)         AS total_obligated,
+        SUM(unobligated)       AS total_unobligated,
+        CASE
+            WHEN SUM(total_allocation) > 0 THEN (SUM(obligated) / SUM(total_allocation)) * 100
+            ELSE 0
+        END AS program_utilization_rate
+    FROM vw_pap_financial_summary
+    GROUP BY fiscal_year, pap_type_code;`,
+
+    `CREATE OR REPLACE VIEW vw_pr_items_full AS
+    SELECT
+        i.id AS item_id, i.pr_id, i.description, i.quantity, i.unit, i.unit_cost, i.total AS item_total,
+        pr.prno, pr.purpose, m.office, m.pap_des, m.ref_main_name AS activity
+    FROM pr_items i
+    JOIN pr_so pr ON i.pr_id = pr.id
+    LEFT JOIN mooe m ON pr.mooe_id = m.id WHERE pr.is_deleted = 0;`,
+
+    `CREATE OR REPLACE VIEW vw_pr_details AS
+    SELECT
+        pr.id, pr.mooe_id, pr.prno, pr.purpose, pr.workflow_status, pr.remarks, pr.amount AS pr_amount, pr.created_at, YEAR(pr.created_at) AS fiscal_year,
+        m.office, m.pap_type, m.pap_type_code, m.pap_des, m.pap_des_code, m.name AS activity, m.performance_indicator, m.expense_items, m.expense_items_sub,
+        COALESCE(SUM(CASE WHEN ob.is_deleted = 0 THEN ob.amount ELSE 0 END), 0) AS obligated_amount,
+        (pr.amount - COALESCE(SUM(CASE WHEN ob.is_deleted = 0 THEN ob.amount ELSE 0 END), 0)) AS remaining_balance,
+        (CASE
+            WHEN (COALESCE(SUM(CASE WHEN ob.is_deleted = 0 THEN ob.amount ELSE 0 END), 0) = 0) THEN 'NOT_OBLIGATED'
+            WHEN ((pr.amount - COALESCE(SUM(CASE WHEN ob.is_deleted = 0 THEN ob.amount ELSE 0 END), 0)) > 0) THEN 'PARTIALLY_OBLIGATED'
+            ELSE 'FULLY_OBLIGATED'
+        END) AS budget_status
+    FROM pr_so pr LEFT JOIN mooe m ON pr.mooe_id = m.id LEFT JOIN obligation ob ON pr.id = ob.pr_id WHERE pr.is_deleted = 0
+    GROUP BY pr.id, pr.mooe_id, pr.prno, pr.purpose, pr.workflow_status, pr.remarks, pr.amount, pr.created_at, m.id;`,
+
+    `CREATE OR REPLACE VIEW vw_obligation_details AS
+    SELECT
+        o.id, o.obrno, o.prno, o.payee, o.particular, o.amount, o.created_at, YEAR(o.created_at) AS fiscal_year,
+        CASE WHEN o.mooe_id IS NOT NULL THEN 'MOOE' WHEN o.ps_id IS NOT NULL THEN 'PS' ELSE 'OTHER' END AS allotment_class,
+        COALESCE(m.office, 'N/A') AS office, COALESCE(m.pap_type, p.pap_type) AS pap_type,
+        COALESCE(m.pap_des, p.pap_des) AS pap_des, COALESCE(m.expense_items, p.expense_items) AS expense_item
+    FROM obligation o LEFT JOIN mooe m ON o.mooe_id = m.id LEFT JOIN ps p ON o.ps_id = p.id WHERE o.is_deleted = 0;`,
+
+    `CREATE OR REPLACE VIEW vw_mooe_excel_full_report AS
+    SELECT
+        m.id,
+        m.plan_id,
+        YEAR(m.created_at) AS plan_year,
+        m.pap_type_code,
         m.pap_type,
+        m.pap_des_code,
         m.pap_des,
-        m.office as division,
-        m.ref_main_name,
-        COALESCE(SUM(o.amount), 0) as amount_obligated,
-        (p.amount - COALESCE(SUM(o.amount), 0)) as amount_unobligated
-      FROM pr_so p
-      LEFT JOIN mooe m ON p.mooe_id = m.id
-      LEFT JOIN obligation o ON p.prno = o.prno AND o.is_deleted = 0
-      WHERE p.is_deleted = 0
-      GROUP BY p.id, p.prno, p.created_at, p.amount, m.name, m.expense_items, m.expense_items_sub, m.pap_type, m.pap_des, m.office, m.ref_main_name
-    `);
+        m.office,
+        m.name AS activity,
+        m.performance_indicator,
+        m.expense_items        AS object_group,
+        m.expense_items_sub    AS sub_object,
+        COALESCE(NULLIF(m.sub_total_name, ''), '-') AS row_label,
+        m.report_order,
+        m.count_type,
+        CASE
+            WHEN m.is_subtotal = 1 THEN 'SUBTOTAL'
+            ELSE 'DETAIL'
+        END AS row_type,
+        CASE
+            WHEN m.is_subtotal = 0 THEN COALESCE(m.totalFq, 0)
+            WHEN m.sub_total_name IN ('Difference', 'Difference MOOE', 'Difference CO') THEN 0.00
+            WHEN m.sub_total_name IN ('Sub-total, GMS, MOOE', 'Ceiling, GSM') THEN (
+                SELECT COALESCE(SUM(x.totalFq), 0) FROM mooe x
+                WHERE x.is_deleted = 0 AND x.is_subtotal = 0 AND x.plan_id = m.plan_id
+                  AND x.pap_des_code = '100000100001000'
+            )
+            WHEN m.sub_total_name IN ('Sub-total, HRD, MOOE', 'Ceiling, HRD') THEN (
+                SELECT COALESCE(SUM(x.totalFq), 0) FROM mooe x
+                WHERE x.is_deleted = 0 AND x.is_subtotal = 0 AND x.plan_id = m.plan_id
+                  AND x.pap_des_code = '100000100002000'
+            )
+            WHEN m.sub_total_name = 'TOTAL GSM, MOOE' THEN (
+                SELECT COALESCE(SUM(x.totalFq), 0) FROM mooe x
+                WHERE x.is_deleted = 0 AND x.is_subtotal = 0 AND x.plan_id = m.plan_id
+                  AND x.pap_type_code = '100000000000000'
+            )
+            WHEN m.sub_total_name = 'Sub-total, General Management and Supervision (PS)' THEN (
+                SELECT COALESCE(SUM(p.amount), 0) FROM ps p
+                WHERE p.is_deleted = 0 AND p.plan_id = m.plan_id AND p.pap_des_code = '100000100001000'
+            )
+            WHEN m.sub_total_name = 'Sub-total, Administration of Personnel Benefits (PS)' THEN (
+                SELECT COALESCE(SUM(p.amount), 0) FROM ps p
+                WHERE p.is_deleted = 0 AND p.plan_id = m.plan_id AND p.pap_des_code = '100000100002000'
+            )
+            WHEN m.sub_total_name = 'TOTAL, MOOE' AND m.pap_type_code = '310100000000000' THEN (
+                SELECT COALESCE(SUM(x.totalFq), 0) FROM mooe x
+                WHERE x.is_deleted = 0 AND x.is_subtotal = 0 AND x.plan_id = m.plan_id AND x.pap_des_code = m.pap_des_code
+            )
+            WHEN m.sub_total_name = 'GRAND TOTAL, PS' THEN (
+                SELECT COALESCE(SUM(p.amount), 0) FROM ps p WHERE p.is_deleted = 0 AND p.plan_id = m.plan_id
+            )
+            WHEN m.sub_total_name = 'GRAND TOTAL, RLIP' THEN (
+                SELECT COALESCE(SUM(r.amount), 0) FROM rlip r JOIN ps p ON r.ps_id = p.id
+                WHERE r.is_deleted = 0 AND p.plan_id = m.plan_id
+            )
+            WHEN m.sub_total_name = 'GRAND TOTAL, MOOE' THEN (
+                SELECT COALESCE(SUM(x.totalFq), 0) FROM mooe x
+                WHERE x.is_deleted = 0 AND x.is_subtotal = 0 AND x.plan_id = m.plan_id
+            )
+            ELSE 0.00
+        END AS total_amount
+    FROM mooe m
+    WHERE m.is_deleted = 0;`,
 
-    // 4. Financial Summary Views
-    console.log("Creating financial summary views...");
+    `CREATE OR REPLACE VIEW vw_ps_details AS
+    SELECT
+        p.id, p.plan_id, p.activities_id, p.pap_type, p.pap_type_code, p.pap_des, p.pap_des_code,
+        p.expense_items, p.amount, p.total, p.report_order, p.created_at, YEAR(p.created_at) as fiscal_year,
+        COALESCE(SUM(CASE WHEN ob.is_deleted = 0 THEN ob.amount ELSE 0 END), 0) as obligated_amount,
+        (p.amount - COALESCE(SUM(CASE WHEN ob.is_deleted = 0 THEN ob.amount ELSE 0 END), 0)) as remaining_balance
+    FROM ps p
+    LEFT JOIN obligation ob ON p.id = ob.ps_id
+    WHERE p.is_deleted = 0
+    GROUP BY p.id;`
+];
 
-    await connection.execute(`
-      CREATE OR REPLACE VIEW vw_pap_financial_summary AS
-      SELECT
-          base.fiscal_year AS fiscal_year,
-          base.pap_type AS pap_type,
-          MAX(base.pap_type_code) AS pap_type_code,
-          base.pap_des_code AS pap_des_code,
-          MAX((CASE
-              WHEN (base.pap_des_code = '100000100001000') THEN 'General Management and Supervision'
-              WHEN (base.pap_des_code = '100000100002000') THEN 'Human Resource Development'
-              WHEN (base.pap_des_code = '310100100001000') THEN 'Nutrition Policy, Standards, Plan and Program Development'
-              WHEN (base.pap_des_code = '310100100002000') THEN 'Philippine Food and Nutrition Surveillance'
-              WHEN (base.pap_des_code = '310100100003000') THEN 'Promotion of Good Nutrition'
-              WHEN (base.pap_des_code = '310100100004000') THEN 'Assistance to National, Local Nutrition and Related Programs'
-              ELSE base.pap_des
-          END)) AS pap_description,
-          SUM((CASE
-              WHEN (base.source = 'PS') THEN base.amount
-              ELSE 0
-          END)) AS ps,
-          SUM((CASE
-              WHEN (base.source = 'RLIP') THEN base.amount
-              ELSE 0
-          END)) AS rlip,
-          SUM((CASE
-              WHEN (base.source = 'MOOE') THEN base.amount
-              ELSE 0
-          END)) AS mooe,
-          SUM(base.amount) AS total_allocation,
-          COALESCE((SELECT
-                          SUM(o.amount)
-                      FROM
-                          ((obligation o
-                          LEFT JOIN mooe m ON ((o.mooe_id = m.id)))
-                          LEFT JOIN ps p ON ((o.ps_id = p.id)))
-                      WHERE
-                          ((o.is_deleted = 0)
-                              AND (((m.pap_des_code = base.pap_des_code)
-                              AND (YEAR(m.created_at) = base.fiscal_year))
-                              OR ((p.pap_des_code = base.pap_des_code)
-                              AND (YEAR(p.created_at) = base.fiscal_year))))),
-                  0) AS obligated,
-          (SUM(base.amount) - COALESCE((SELECT
-                          SUM(o.amount)
-                      FROM
-                          ((obligation o
-                          LEFT JOIN mooe m ON ((o.mooe_id = m.id)))
-                          LEFT JOIN ps p ON ((o.ps_id = p.id)))
-                      WHERE
-                          ((o.is_deleted = 0)
-                              AND (((m.pap_des_code = base.pap_des_code)
-                              AND (YEAR(m.created_at) = base.fiscal_year))
-                              OR ((p.pap_des_code = base.pap_des_code)
-                              AND (YEAR(p.created_at) = base.fiscal_year))))),
-                  0)) AS unobligated
-      FROM
-          (SELECT
-              YEAR(ps.created_at) AS fiscal_year,
-                  ps.pap_type AS pap_type,
-                  ps.pap_type_code AS pap_type_code,
-                  ps.pap_des AS pap_des,
-                  ps.pap_des_code AS pap_des_code,
-                  ps.amount AS amount,
-                  'PS' AS source
-          FROM ps
-          WHERE (ps.is_deleted = 0)
-          UNION ALL
-          SELECT
-              YEAR(r.created_at) AS fiscal_year,
-                  p.pap_type AS pap_type,
-                  p.pap_type_code AS pap_type_code,
-                  r.pap_des AS pap_des,
-                  r.pap_des_code AS pap_des_code,
-                  r.amount AS amount,
-                  'RLIP' AS source
-          FROM (rlip r JOIN ps p ON ((r.ps_id = p.id)))
-          WHERE (r.is_deleted = 0)
-          UNION ALL
-          SELECT
-              YEAR(mooe.created_at) AS fiscal_year,
-                  mooe.pap_type AS pap_type,
-                  mooe.pap_type_code AS pap_type_code,
-                  mooe.pap_des AS pap_des,
-                  mooe.pap_des_code AS pap_des_code,
-                  mooe.totalFq AS amount,
-                  'MOOE' AS source
-          FROM mooe
-          WHERE ((mooe.is_deleted = 0) AND (mooe.is_subtotal = 0))) base
-      GROUP BY base.fiscal_year , base.pap_des_code , base.pap_type
-    `);
+async function migrate() {
+    try {
+        console.log("Starting full database migration (Views & Constraints)...");
+        const connection = await pool.getConnection();
 
-    await connection.execute(`
-      CREATE OR REPLACE VIEW vw_program_financial_summary AS
-      SELECT
-          vw_pap_financial_summary.fiscal_year AS fiscal_year,
-          vw_pap_financial_summary.pap_type AS pap_type,
-          MAX(vw_pap_financial_summary.pap_type_code) AS pap_type_code,
-          SUM(vw_pap_financial_summary.ps) AS total_ps,
-          SUM(vw_pap_financial_summary.rlip) AS total_rlip,
-          SUM(vw_pap_financial_summary.mooe) AS total_mooe,
-          SUM(vw_pap_financial_summary.total_allocation) AS grand_total_allocation,
-          SUM(vw_pap_financial_summary.obligated) AS total_obligated,
-          SUM(vw_pap_financial_summary.unobligated) AS total_unobligated,
-          (CASE
-              WHEN (SUM(vw_pap_financial_summary.total_allocation) > 0) THEN ((SUM(vw_pap_financial_summary.obligated) / SUM(vw_pap_financial_summary.total_allocation)) * 100)
-              ELSE 0
-          END) AS program_utilization_rate
-      FROM
-          vw_pap_financial_summary
-      GROUP BY vw_pap_financial_summary.fiscal_year , vw_pap_financial_summary.pap_type
-    `);
+        // Hardening
+        console.log("Applying unique constraints and indexes...");
+        const hardening = [
+            "ALTER TABLE pr_so MODIFY prno VARCHAR(100) UNIQUE",
+            "ALTER TABLE obligation MODIFY obrno VARCHAR(100) UNIQUE",
+            "ALTER TABLE plan_info MODIFY plan_id VARCHAR(100) PRIMARY KEY",
+            "CREATE INDEX idx_mooe_plan_id ON mooe(plan_id)",
+            "CREATE INDEX idx_ps_plan_id ON ps(plan_id)",
+            "CREATE INDEX idx_obligation_prno ON obligation(prno)",
+            "CREATE INDEX idx_obligation_mooe_id ON obligation(mooe_id)",
+            "CREATE INDEX idx_obligation_ps_id ON obligation(ps_id)"
+        ];
 
-    console.log("Database hardening complete.");
-  } catch (error) {
-    console.error("Migration failed:", error.message);
-  } finally {
-    connection.release();
-    process.exit();
-  }
-};
+        for (const sql of hardening) {
+            try { await connection.execute(sql); } catch (e) { console.log(`  Skipped: ${e.message}`); }
+        }
+
+        // Views
+        console.log("Creating/Updating database views...");
+        for (const view of views) {
+            await connection.execute(view);
+            console.log("  View updated successfully.");
+        }
+
+        connection.release();
+        console.log("Full migration completed successfully.");
+        process.exit(0);
+    } catch (error) {
+        console.error("Migration failed:", error);
+        process.exit(1);
+    }
+}
 
 migrate();

@@ -10,7 +10,7 @@ import {
   Loader2,
   XCircle,
 } from "lucide-react";
-import { prAPI } from "../../services/api";
+import { prAPI, monitoringAPI } from "../../services/api";
 import { formatPHP } from "../../utils/formatters";
 import ToastService from "../../services/ToastService";
 import EmptyState from "../../components/common/EmptyState";
@@ -100,7 +100,7 @@ const ReviewQueue = () => {
   const fetchQueue = async () => {
     try {
       setLoading(true);
-      const res = await prAPI.getAll();
+      const res = await monitoringAPI.getPRs();
       if (res.success) {
         setItems((res.data || []).filter(pr => pr.workflow_status === 'For Review'));
       }

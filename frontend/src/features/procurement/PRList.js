@@ -5,7 +5,7 @@ import DataTable from "../../components/common/DataTable";
 import Button from "../../components/common/Button";
 import StatusBadge from "../../components/common/StatusBadge";
 import ToastService from "../../services/ToastService";
-import { prAPI } from "../../services/api";
+import { prAPI, monitoringAPI } from "../../services/api";
 import { formatPHP } from "../../utils/formatters";
 
 const PRList = ({ onNavigate }) => {
@@ -20,7 +20,7 @@ const PRList = ({ onNavigate }) => {
   const fetchPRs = async () => {
     try {
       setLoading(true);
-      const res = await prAPI.getAll();
+      const res = await monitoringAPI.getPRs();
       if (res.success) setPrData(res.data || []);
     } catch (err) {
       console.error("Failed to fetch PRs", err);

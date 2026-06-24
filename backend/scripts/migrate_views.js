@@ -87,7 +87,7 @@ const views = [
 
     `CREATE OR REPLACE VIEW vw_pr_items_full AS
     SELECT
-        i.id AS item_id, i.description, i.quantity, i.unit, i.unit_cost, i.total AS item_total,
+        i.id AS item_id, i.pr_id, i.description, i.quantity, i.unit, i.unit_cost, i.total AS item_total,
         pr.prno, pr.purpose, m.office, m.pap_des, m.ref_main_name AS activity
     FROM pr_items i
     JOIN pr_so pr ON i.pr_id = pr.id
@@ -180,7 +180,18 @@ const views = [
             ELSE 0.00
         END AS total_amount
     FROM mooe m
-    WHERE m.is_deleted = 0;`
+    WHERE m.is_deleted = 0;`,
+
+    `CREATE OR REPLACE VIEW vw_ps_details AS
+    SELECT
+        p.id, p.plan_id, p.activities_id, p.pap_type, p.pap_type_code, p.pap_des, p.pap_des_code,
+        p.expense_items, p.amount, p.total, p.report_order, p.created_at, YEAR(p.created_at) as fiscal_year,
+        COALESCE(SUM(CASE WHEN ob.is_deleted = 0 THEN ob.amount ELSE 0 END), 0) as obligated_amount,
+        (p.amount - COALESCE(SUM(CASE WHEN ob.is_deleted = 0 THEN ob.amount ELSE 0 END), 0)) as remaining_balance
+    FROM ps p
+    LEFT JOIN obligation ob ON p.id = ob.ps_id
+    WHERE p.is_deleted = 0
+    GROUP BY p.id;`
 ];
 
 async function migrate() {

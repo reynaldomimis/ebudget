@@ -15,18 +15,18 @@ class MonitoringEngine {
 
     const summary = await FinancialEngine.getExecutiveSummary(planId);
 
-    // Efficiently get counts instead of fetching all records
+    // Efficiently get counts instead of fetching all records from tables
     const [prStats] = await pool.query(`
       SELECT
         COUNT(*) as total,
-        SUM(CASE WHEN workflow_status != 'Obligated' THEN 1 ELSE 0 END) as active,
-        SUM(CASE WHEN workflow_status = 'Obligated' THEN 1 ELSE 0 END) as fullyObligated
-      FROM pr_so
-      WHERE is_deleted = 0 AND YEAR(created_at) = ?
+        SUM(CASE WHEN budget_status != 'FULLY_OBLIGATED' THEN 1 ELSE 0 END) as active,
+        SUM(CASE WHEN budget_status = 'FULLY_OBLIGATED' THEN 1 ELSE 0 END) as fullyObligated
+      FROM vw_pr_details
+      WHERE fiscal_year = ?
     `, [year]);
 
     const [obStats] = await pool.query(`
-      SELECT COUNT(*) as total FROM obligation WHERE is_deleted = 0 AND YEAR(transaction_date) = ?
+      SELECT COUNT(*) as total FROM vw_obligation_details WHERE fiscal_year = ?
     `, [year]);
 
     const stats = prStats[0] || { total: 0, active: 0, fullyObligated: 0 };

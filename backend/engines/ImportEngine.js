@@ -8,18 +8,13 @@ const { PAP_MAPPING_BY_LABEL } = require("../config/PapMappingConfig");
 
 class ImportEngine {
   static async getNextReportOrder(connection) {
-    const [psRes] = await connection.execute("SELECT MAX(report_order) as maxOrder FROM ps");
-    const [mooeRes] = await connection.execute("SELECT MAX(report_order) as maxOrder FROM mooe");
-    let maxRLIP = 0;
-    try {
-      const [rlipRes] = await connection.execute("SELECT MAX(report_order) as maxOrder FROM rlip");
-      maxRLIP = rlipRes[0].maxOrder || 0;
-    } catch (e) {}
+    const [psRes] = await connection.execute("SELECT MAX(report_order) as maxOrder FROM vw_ps_details");
+    const [mooeRes] = await connection.execute("SELECT MAX(report_order) as maxOrder FROM vw_mooe_excel_full_report");
 
     const maxPS = psRes[0].maxOrder || 0;
     const maxMOOE = mooeRes[0].maxOrder || 0;
 
-    return Math.max(maxPS, maxMOOE, maxRLIP) + 1;
+    return Math.max(maxPS, maxMOOE) + 1;
   }
 
   static resolveCodes(label) {
@@ -203,7 +198,7 @@ class ImportEngine {
           let parentData = papDataMap[ps.pap_des_code];
           if (!parentData) {
             const [anyPs] = await conn.execute(
-              "SELECT id FROM ps WHERE pap_des_code = ? ORDER BY id DESC LIMIT 1",
+              "SELECT id FROM vw_ps_details WHERE pap_des_code = ? ORDER BY id DESC LIMIT 1",
               [ps.pap_des_code]
             );
             if (anyPs.length > 0) parentData = { id: anyPs[0].id };

@@ -60,11 +60,32 @@ class FinancialController {
 
   static async getFilters(req, res) {
     try {
-      let { plan_id, type } = req.query;
-      plan_id = await FiscalYearContext.resolvePlanId(plan_id);
+      let { plan_id } = req.query;
+
+      // FIX: Don't resolve to a specific ID if it's just a year
+      // This allows FilterEngine to use LIKE '%2026%' to get both MOOE and PS data
+      if (plan_id && !/^20\d{2}$/.test(String(plan_id))) {
+          plan_id = await FiscalYearContext.resolvePlanId(plan_id);
+      }
 
       const data = await FilterEngine.getHierarchicalFilters(plan_id);
       res.json({ success: true, data });
+    } catch (error) {
+      handleError(error, res);
+    }
+  }
+
+  static async getBalance(req, res) {
+    try {
+      const { id, type } = req.query;
+      const BalanceEngine = require("../engines/BalanceEngine");
+      let balance = 0;
+      if (type === 'PS') {
+        balance = await BalanceEngine.getPSBalance(id);
+      } else {
+        balance = await BalanceEngine.getAvailableAllocation(id);
+      }
+      res.json({ success: true, data: { balance } });
     } catch (error) {
       handleError(error, res);
     }

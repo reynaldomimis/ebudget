@@ -2,7 +2,7 @@ const { pool } = require("../config/database");
 
 class SequenceEngine {
   static async getNextPRNo(year, month) {
-    const query = `SELECT MAX(prno) as latest_prno FROM pr_so`;
+    const query = `SELECT MAX(prno) as latest_prno FROM vw_pr_details`;
     const [rows] = await pool.execute(query);
     const latestPrNo = rows[0]?.latest_prno;
 
@@ -19,7 +19,7 @@ class SequenceEngine {
   }
 
   static async getNextOBRNo(year, month) {
-    const query = `SELECT MAX(obrno) as latest_obrno FROM obligation`;
+    const query = `SELECT MAX(obrno) as latest_obrno FROM vw_obligation_details`;
     const [rows] = await pool.execute(query);
     const latestObrNo = rows[0]?.latest_obrno;
 

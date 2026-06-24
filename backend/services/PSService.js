@@ -20,17 +20,12 @@ class PSService {
       await FiscalYearRepository.create(planData, connection);
 
       const ImportEngine = require("../engines/ImportEngine");
-      // Use ImportEngine to handle strict RLIP separation
       const recordsWithPlanId = psItems.map(item => ({ ...item, plan_id }));
       await ImportEngine.importPS(recordsWithPlanId, connection);
 
       await AuditEngine.log("PS_PLAN_CREATED", { plan_id, count: psItems.length });
       return { plan_id, psItems };
     });
-  }
-
-  static async getAllPS(filters) {
-    return await PSRepository.getAll(filters);
   }
 
   static async updatePS(id, data) {
@@ -47,11 +42,6 @@ class PSService {
     CacheEngine.invalidate("exec_summary");
     await AuditEngine.log("PS_DELETED", { id }, null, 'PS', id);
     return result;
-  }
-
-  static async getDistinctValues(field) {
-    const FilterEngine = require("../engines/FilterEngine");
-    return await FilterEngine.getDistinctValues("ps", field);
   }
 }
 

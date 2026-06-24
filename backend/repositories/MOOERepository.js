@@ -2,7 +2,6 @@ const { pool } = require("../config/database");
 
 class MOOERepository {
   static async create(mooeData, connection = pool) {
-    console.log("DEBUG: IMPORT REPOSITORY HIT - Saving Record:", mooeData.name);
     const query = `INSERT INTO mooe (
       plan_id, pap_type, pap_type_code, pap_des, pap_des_code, office,
       ref_main_name, ref_middle_name, ref_center_name, ref_last_name,
@@ -43,46 +42,6 @@ class MOOERepository {
       mooeData.report_order || 0
     ]);
     return result;
-  }
-
-  static async getByPlan(plan_id, filters = {}) {
-    let query = "SELECT id, pap_type, pap_des, office, activity as name, object_group as expense_items, sub_object as expense_items_sub, total_amount as totalFq FROM vw_mooe_excel_full_report WHERE 1=1";
-    const values = [];
-
-    if (plan_id) {
-        query += " AND plan_id = ?";
-        values.push(plan_id);
-    }
-
-    const filterMap = {
-        "id": "id",
-        "pap_type": "pap_type",
-        "pap_type_code": "pap_type_code",
-        "pap_des": "pap_des",
-        "pap_des_code": "pap_des_code",
-        "office": "office",
-        "name": "activity",
-        "expense_items": "object_group",
-        "expense_items_sub": "sub_object"
-    };
-
-    Object.keys(filters).forEach(field => {
-        const targetField = filterMap[field];
-        if (targetField && filters[field]) {
-            query += ` AND ${targetField} = ?`;
-            values.push(filters[field]);
-        }
-    });
-
-    query += " AND row_type = 'DETAIL' AND total_amount > 0";
-    query += " ORDER BY report_order";
-    const [rows] = await pool.execute(query, values);
-    return rows;
-  }
-
-  static async getById(id, connection = pool) {
-    const [rows] = await connection.execute("SELECT * FROM mooe WHERE id = ? AND is_deleted = 0", [id]);
-    return rows[0];
   }
 
   static async update(id, data, connection = pool) {

@@ -1,38 +1,40 @@
-const PRRepository = require("../repositories/PRRepository");
-const ObligationRepository = require("../repositories/ObligationRepository");
-const MOOERepository = require("../repositories/MOOERepository");
-const PSRepository = require("../repositories/PSRepository");
+const { pool } = require("../config/database");
 
 class BalanceEngine {
-  static async getMOOEBalance(mooeId, connection) {
-    const mooeItem = await MOOERepository.getById(mooeId, connection);
-    if (!mooeItem) return 0;
+  static async getMOOEBalance(mooeId, connection = pool) {
+    const [rows] = await connection.query("SELECT total_amount FROM vw_mooe_excel_full_report WHERE id = ?", [mooeId]);
+    if (rows.length === 0) return 0;
 
-    const obligations = await ObligationRepository.getByMOOEId(mooeId, connection);
-    const totalObligated = obligations.reduce((sum, o) => sum + Number(o.amount), 0);
+    const [obRows] = await connection.query("SELECT SUM(amount) as total FROM vw_obligation_details WHERE allotment_class = 'MOOE' AND id = ?", [mooeId]);
+    const totalObligated = Number(obRows[0].total || 0);
 
-    return Number(mooeItem.totalFq) - totalObligated;
+    return Number(rows[0].total_amount || 0) - totalObligated;
   }
 
-  static async getPRBalance(prno, connection) {
-    const pr = await PRRepository.getByPRNo(prno, connection);
-    if (!pr) return 0;
-    return Number(pr.remaining_balance);
+  static async getPRBalance(prno, connection = pool) {
+    const [rows] = await connection.query("SELECT remaining_balance FROM vw_pr_details WHERE prno = ?", [prno]);
+    if (rows.length === 0) return 0;
+    return Number(rows[0].remaining_balance || 0);
   }
 
-  static async getPSBalance(psId, connection) {
-    const ps = await PSRepository.getById(psId, connection);
-    if (!ps) return 0;
+  static async getPSBalance(psId, connection = pool) {
+    const [rows] = await connection.query("SELECT amount FROM vw_ps_details WHERE id = ?", [psId]);
+    if (rows.length === 0) return 0;
 
-    const obligations = await ObligationRepository.getByPSId(psId, connection);
-    const totalObligated = obligations.reduce((sum, o) => sum + Number(o.amount), 0);
+    const [obRows] = await connection.query("SELECT SUM(amount) as total FROM vw_obligation_details WHERE allotment_class = 'PS' AND id = ?", [psId]);
+    const totalObligated = Number(obRows[0].total || 0);
 
-    return Number(ps.total) - totalObligated;
+    return Number(rows[0].amount || 0) - totalObligated;
   }
 
-  static async getAvailableAllocation(mooeId, connection) {
-    const { pool } = require("../config/database");
-    const [viewRows] = await (connection || pool).query(
+  /**
+   * getAvailableAllocation
+   * Returns the remaining budget for a specific MOOE line item.
+   * Logic: Total Allotment - (Total PRs created against this line) - (Direct Obligations without PR)
+   */
+  static async getAvailableAllocation(mooeId, connection = pool) {
+    // 1. Get the Total Allotment from the report view
+    const [viewRows] = await connection.query(
       "SELECT total_amount FROM vw_mooe_excel_full_report WHERE id = ?",
       [mooeId]
     );
@@ -40,26 +42,30 @@ class BalanceEngine {
     if (viewRows.length === 0) return 0;
     const totalAmount = Number(viewRows[0].total_amount || 0);
 
-    const prs = await PRRepository.getByMOOEId(mooeId, connection);
-    const totalPRAmount = prs.reduce((sum, p) => sum + Number(p.pr_amount), 0);
+    // 2. Get all PRs linked to this MOOE ID (excluding deleted ones via view)
+    const [prRows] = await connection.query("SELECT pr_amount FROM vw_pr_details WHERE mooe_id = ?", [mooeId]);
+    const totalPRAmount = prRows.reduce((sum, p) => sum + Number(p.pr_amount), 0);
 
-    const obligations = await ObligationRepository.getByMOOEId(mooeId, connection);
-    const directObligations = obligations.filter(o => !o.prno).reduce((sum, o) => sum + Number(o.amount), 0);
+    // 3. Get direct obligations (not linked to any PR)
+    const [obRows] = await connection.query("SELECT amount FROM vw_obligation_details WHERE allotment_class = 'MOOE' AND id = ? AND (prno IS NULL OR prno = '')", [mooeId]);
+    const directObligations = obRows.reduce((sum, o) => sum + Number(o.amount), 0);
 
-    return totalAmount - totalPRAmount - directObligations;
+    // 4. Remaining is what's left to be used for NEW PRs
+    const available = totalAmount - totalPRAmount - directObligations;
+
+    return available;
   }
 
-  static async getPAPBalance(planId, papDes, connection) {
-    const mooeItems = await MOOERepository.getByPlan(planId, connection);
-    const papMOOEs = mooeItems.filter(a => a.pap_des === papDes && !a.is_subtotal);
+  static async getPAPBalance(planId, papDes, connection = pool) {
+    const [mooeItems] = await connection.query("SELECT id, total_amount FROM vw_mooe_excel_full_report WHERE (plan_id = ? OR plan_year = ?) AND pap_des = ? AND row_type = 'DETAIL'", [planId, planId, papDes]);
 
     let totalAllocation = 0;
     let totalObligated = 0;
 
-    for (const item of papMOOEs) {
-        totalAllocation += Number(item.totalFq);
-        const obligations = await ObligationRepository.getByMOOEId(item.id, connection);
-        totalObligated += obligations.reduce((sum, o) => sum + Number(o.amount), 0);
+    for (const item of mooeItems) {
+        totalAllocation += Number(item.total_amount);
+        const [obRows] = await connection.query("SELECT SUM(amount) as total FROM vw_obligation_details WHERE allotment_class = 'MOOE' AND id = ?", [item.id]);
+        totalObligated += Number(obRows[0].total || 0);
     }
 
     return totalAllocation - totalObligated;

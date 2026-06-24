@@ -1,4 +1,4 @@
-import { mooeAPI, psAPI } from './api';
+import { mooeAPI, psAPI, financialAPI } from './api';
 import DataNormalizationEngine from '../utils/DataNormalizationEngine';
 
 
@@ -23,7 +23,6 @@ class TransactionFilterEngine {
   static async getPapDescriptions(allotmentClass, papType) {
     try {
       const api = this.getAPI(allotmentClass);
-      // For MOOE, use distinct values with code mapping. For PS, keep original behavior.
       if (allotmentClass === 'MOOE') {
         const response = await api.getDistinctValues('pap_des', { pap_type: papType });
         return response.data || [];
@@ -108,30 +107,15 @@ class TransactionFilterEngine {
    * getAvailableAllocation
    * Centralized logic for determining budget availability based on source table.
    */
-  static async getAvailableAllocation({ allotmentClass, papType, papDes, office, mooeId }) {
+  static async getAvailableAllocation({ allotmentClass, mooeId }) {
     try {
-      const api = this.getAPI(allotmentClass);
+      if (!mooeId) return 0;
 
-      if (allotmentClass === 'PS') {
-        // PS: SUM(ps.amount) grouped by PAP
-        if (!papDes) return 0;
-        const response = await api.getAll({ pap_type: papType, pap_des: papDes });
-        const records = response.data || [];
-        // Summing from ps table: usually uses 'amount' or 'allocation' field
-        return records.reduce((sum, r) => sum + (parseFloat(r.amount) || parseFloat(r.allocation) || 0), 0);
-      }
+      // Use the centralized balance API
+      const response = await financialAPI.getBalance(mooeId, allotmentClass);
 
-      if (allotmentClass === 'MOOE' || allotmentClass === 'CO') {
-        // MOOE/CO: Use mooe table
-        if (!mooeId) return 0;
-        const response = await api.getById(mooeId);
-        const data = response.data;
-
-        if (!data) return 0;
-
-        // Use availableAllocation from BalanceEngine via the API
-        if (allotmentClass === 'MOOE') return parseFloat(data.availableAllocation) ?? parseFloat(data.totalFq) ?? 0;
-        if (allotmentClass === 'CO') return parseFloat(data.total_co_amount) || parseFloat(data.co?.allocation) || 0;
+      if (response.success) {
+        return parseFloat(response.data.balance) || 0;
       }
 
       return 0;

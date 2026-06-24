@@ -44,7 +44,8 @@ export const financialAPI = {
   getPapSummary: (planId) => api.get("/financial/summary/pap", { params: { plan_id: planId } }),
   getPapDetail: (params) => api.get("/financial/pap-detail", { params }),
   getBudgetRegistry: () => api.get("/financial/registry"),
-  getFilters: () => api.get("/financial/filters"),
+  getFilters: (params) => api.get("/financial/filters", { params }),
+  getBalance: (id, type) => api.get("/financial/balance", { params: { id, type } }),
 };
 
 export const dashboardAPI = {
@@ -54,42 +55,30 @@ export const dashboardAPI = {
 };
 
 export const mooeAPI = {
-  getAll: (filters) => api.get("/mooe", { params: filters }),
-  getById: (id) => api.get(`/mooe/${id}`),
   createPlanWithMOOE: (data) => api.post("/mooe", data),
   update: (id, data) => api.put(`/mooe/${id}`, data),
   delete: (id) => api.delete(`/mooe/${id}`),
   deleteByPlanId: (planId) => api.delete(`/mooe/plan/${planId}`),
-  getDistinctValues: (field, filters) => api.get(`/mooe/distinct/${field}`, { params: filters }),
 };
 
 export const psAPI = {
-  getAll: (filters) => api.get("/ps", { params: filters }),
-  getById: (id) => api.get(`/ps/${id}`),
   createPlanWithPS: (data) => api.post("/ps", data),
   update: (id, data) => api.put(`/ps/${id}`, data),
   delete: (id) => api.delete(`/ps/${id}`),
-  getDistinctValues: (field) => api.get(`/ps/distinct/${field}`),
 };
 
 export const prAPI = {
-  getAll: () => api.get("/pr"),
-  getMOOE: () => api.get("/pr/mooe"),
-  getWithBalance: () => api.get("/pr/mooe-balance"),
-  getByMOOEId: (id) => api.get(`/pr/mooe/${id}`),
   getNextNo: (year, month) => api.get("/pr/next-no", { params: { year, month } }),
   create: (data) => api.post("/pr", data),
+  getById: (id) => api.get(`/pr/${id}`),
   update: (id, data) => api.put(`/pr/${id}`, data),
   delete: (id) => api.delete(`/pr/${id}`),
   submit: (id) => api.post(`/pr/${id}/submit`),
   approve: (id) => api.post(`/pr/${id}/approve`),
   reject: (id, remarks) => api.post(`/pr/${id}/reject`, { remarks }),
-  updateUnobligatedAmount: (prno, data) => api.put(`/pr/unobligated/${prno}`, data),
 };
 
 export const obligationAPI = {
-  getAll: () => api.get("/obligation"),
-  getMOOE: () => api.get("/obligation/mooe"),
   getNextNo: (year, month) => api.get("/obligation/next-no", { params: { year, month } }),
   create: (data) => api.post("/obligation", data),
   update: (id, data) => api.put(`/obligation/${id}`, data),
@@ -98,6 +87,8 @@ export const obligationAPI = {
 
 export const monitoringAPI = {
   getOverview: (planId) => api.get("/monitoring/overview", { params: { plan_id: planId } }),
+  getPRs: () => api.get("/monitoring/prs"),
+  getObligations: () => api.get("/monitoring/obligations"),
 };
 
 export const reportAPI = {
