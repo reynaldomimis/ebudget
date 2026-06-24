@@ -107,12 +107,13 @@ class TransactionFilterEngine {
    * getAvailableAllocation
    * Centralized logic for determining budget availability based on source table.
    */
-  static async getAvailableAllocation({ allotmentClass, mooeId }) {
+  static async getAvailableAllocation({ allotmentClass, mooeId, id }) {
     try {
-      if (!mooeId) return 0;
+      const targetId = allotmentClass === 'PS' ? id : mooeId;
+      if (!targetId) return 0;
 
       // Use the centralized balance API
-      const response = await financialAPI.getBalance(mooeId, allotmentClass);
+      const response = await financialAPI.getBalance(targetId, allotmentClass);
 
       if (response.success) {
         return parseFloat(response.data.balance) || 0;

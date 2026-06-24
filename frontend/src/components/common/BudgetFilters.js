@@ -61,70 +61,94 @@ const BudgetFilters = ({
 
   // 3. Memoized Options
   const papTypes = useMemo(() => {
-    if (allotmentClass === 'PS') return Object.keys(filters.ps || {});
-    return Object.keys(filters.mooe || {});
+    const source = allotmentClass === 'PS' ? filters.ps : filters.mooe;
+    return Object.keys(source || {});
   }, [filters, allotmentClass]);
 
   const papDescriptions = useMemo(() => {
-    if (!selection.papType || !filters.mooe) return [];
-    return Object.keys(filters.mooe[selection.papType] || {});
-  }, [selection.papType, filters]);
+    if (!selection.papType) return [];
+    const source = allotmentClass === 'PS' ? filters.ps : filters.mooe;
+    return Object.keys(source?.[selection.papType] || {});
+  }, [selection.papType, filters, allotmentClass]);
 
+  // MOOE Only
   const offices = useMemo(() => {
-    if (!selection.papDes || !filters.mooe?.[selection.papType]) return [];
-    return Object.keys(filters.mooe[selection.papType][selection.papDes] || {});
-  }, [selection.papDes, selection.papType, filters]);
+    if (allotmentClass === 'PS' || !selection.papDes) return [];
+    return Object.keys(filters.mooe?.[selection.papType]?.[selection.papDes] || {});
+  }, [selection.papDes, selection.papType, filters, allotmentClass]);
 
+  // MOOE Only
   const names = useMemo(() => {
-    if (!selection.office || !filters.mooe?.[selection.papType]?.[selection.papDes]) return [];
-    return Object.keys(filters.mooe[selection.papType][selection.papDes][selection.office] || {});
-  }, [selection.office, selection.papDes, selection.papType, filters]);
+    if (allotmentClass === 'PS' || !selection.office) return [];
+    return Object.keys(filters.mooe?.[selection.papType]?.[selection.papDes]?.[selection.office] || {});
+  }, [selection.office, selection.papDes, selection.papType, filters, allotmentClass]);
 
   const expenseItems = useMemo(() => {
-    if (!selection.name || !filters.mooe?.[selection.papType]?.[selection.papDes]?.[selection.office]) return [];
-    return Object.keys(filters.mooe[selection.papType][selection.papDes][selection.office][selection.name] || {});
-  }, [selection.name, selection.office, selection.papDes, selection.papType, filters]);
+    if (allotmentClass === 'PS') {
+        if (!selection.papDes) return [];
+        return Object.keys(filters.ps?.[selection.papType]?.[selection.papDes] || {});
+    }
+    if (!selection.name) return [];
+    return Object.keys(filters.mooe?.[selection.papType]?.[selection.papDes]?.[selection.office]?.[selection.name] || {});
+  }, [selection.name, selection.office, selection.papDes, selection.papType, filters, allotmentClass]);
 
   const expenseSubItems = useMemo(() => {
-    if (!selection.expenseItem || !filters.mooe?.[selection.papType]?.[selection.papDes]?.[selection.office]?.[selection.name]) return [];
-    return filters.mooe[selection.papType][selection.papDes][selection.office][selection.name][selection.expenseItem] || [];
-  }, [selection.expenseItem, selection.name, selection.office, selection.papDes, selection.papType, filters]);
+    if (allotmentClass === 'PS' || !selection.expenseItem) return [];
+    return filters.mooe?.[selection.papType]?.[selection.papDes]?.[selection.office]?.[selection.name]?.[selection.expenseItem] || [];
+  }, [selection.expenseItem, selection.name, selection.office, selection.papDes, selection.papType, filters, allotmentClass]);
 
   // 4. Update Parent
   useEffect(() => {
-    if (loading) return; // Don't notify while still loading filters
+    if (loading) return;
 
-    const isComplete = allotmentClass === 'PS'
-        ? (!!selection.papType && !!selection.papDes)
-        : (!!selection.mooeId);
+    let isComplete = false;
+    if (allotmentClass === 'PS') {
+        isComplete = !!selection.papDes;
+    } else {
+        isComplete = !!selection.mooeId;
+    }
 
     onSelectionChange({ ...selection, isComplete });
-
-    if (selection.mooeId) isHydrating.current = false;
   }, [selection, allotmentClass, loading]);
 
   const updateSelection = (field, value) => {
     isHydrating.current = false;
     const newSelection = { ...selection, [field]: value };
-    const fields = ['papType', 'papDes', 'office', 'name', 'expenseItem', 'expenseSubItem', 'mooeId'];
+
+    const mooeFields = ['papType', 'papDes', 'office', 'name', 'expenseItem', 'expenseSubItem', 'mooeId'];
+    const psFields = ['papType', 'papDes', 'expenseItem', 'id'];
+
+    const fields = allotmentClass === 'PS' ? psFields : mooeFields;
     const idx = fields.indexOf(field);
 
-    // Correct loop: clear only subsequent fields
-    for (let i = idx + 1; i < fields.length; i++) {
-        newSelection[fields[i]] = '';
+    if (idx !== -1) {
+        for (let i = idx + 1; i < fields.length; i++) {
+            newSelection[fields[i]] = '';
+        }
     }
     setSelection(newSelection);
   };
 
-  // Sync MOOE ID for sub-items
+  // Sync Final IDs
   useEffect(() => {
-    if (selection.expenseItem && expenseSubItems.length > 0) {
-        const found = expenseSubItems.find(i => i.label === selection.expenseSubItem);
-        if (found && found.id.toString() !== selection.mooeId) {
-            setSelection(prev => ({ ...prev, mooeId: found.id.toString() }));
+    if (loading) return;
+
+    if (allotmentClass === 'PS') {
+        if (selection.expenseItem) {
+            const options = filters.ps?.[selection.papType]?.[selection.papDes]?.[selection.expenseItem] || [];
+            if (options.length > 0 && options[0].id.toString() !== selection.id) {
+                setSelection(prev => ({ ...prev, id: options[0].id.toString() }));
+            }
+        }
+    } else {
+        if (selection.expenseItem && expenseSubItems.length > 0) {
+            const found = expenseSubItems.find(i => i.label === selection.expenseSubItem);
+            if (found && found.id.toString() !== selection.mooeId) {
+                setSelection(prev => ({ ...prev, mooeId: found.id.toString() }));
+            }
         }
     }
-  }, [selection.expenseSubItem, selection.expenseItem, expenseSubItems]);
+  }, [selection.expenseSubItem, selection.expenseItem, expenseSubItems, allotmentClass, filters, loading]);
 
   if (loading) return <div className="text-[10px] font-black text-slate-400 uppercase p-4 animate-pulse">Pre-filling Budget Sources...</div>;
 
@@ -150,28 +174,34 @@ const BudgetFilters = ({
         </Select>
       </FormField>
 
-      <FormField label="Office">
-        <Select value={selection.office} onChange={(e) => updateSelection('office', e.target.value)} disabled={!selection.papDes}>
-          <option value="">Select Office...</option>
-          {offices.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-        </Select>
-      </FormField>
+      {allotmentClass === 'MOOE' && (
+        <>
+          <FormField label="Office">
+            <Select value={selection.office} onChange={(e) => updateSelection('office', e.target.value)} disabled={!selection.papDes}>
+              <option value="">Select Office...</option>
+              {offices.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+            </Select>
+          </FormField>
 
-      <FormField label="Name">
-        <Select value={selection.name} onChange={(e) => updateSelection('name', e.target.value)} disabled={!selection.office}>
-          <option value="">Select Name...</option>
-          {names.map(name => <option key={name} value={name}>{name}</option>)}
-        </Select>
-      </FormField>
+          <FormField label="Name">
+            <Select value={selection.name} onChange={(e) => updateSelection('name', e.target.value)} disabled={!selection.office}>
+              <option value="">Select Name...</option>
+              {names.map(name => <option key={name} value={name}>{name}</option>)}
+            </Select>
+          </FormField>
+        </>
+      )}
 
-      <FormField label="Expense Item">
-        <Select value={selection.expenseItem} onChange={(e) => updateSelection('expenseItem', e.target.value)} disabled={!selection.name}>
-          <option value="">Select Expense Item...</option>
-          {expenseItems.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-        </Select>
-      </FormField>
+      {allotmentClass === 'MOOE' && (
+        <FormField label="Expense Item">
+          <Select value={selection.expenseItem} onChange={(e) => updateSelection('expenseItem', e.target.value)} disabled={!selection.papDes || !selection.name}>
+            <option value="">Select Expense Item...</option>
+            {expenseItems.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+          </Select>
+        </FormField>
+      )}
 
-      {expenseSubItems.length > 0 && (
+      {allotmentClass === 'MOOE' && expenseSubItems.length > 0 && (
         <FormField label="Expense Sub Item">
           <Select value={selection.expenseSubItem} onChange={(e) => updateSelection('expenseSubItem', e.target.value)}>
             <option value="">Select Sub Item...</option>

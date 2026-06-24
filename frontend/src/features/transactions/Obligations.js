@@ -4,21 +4,35 @@ import CreateObligation from './CreateObligation';
 
 const Obligations = () => {
   const [view, setView] = useState('list');
+  const [editId, setEditId] = useState(null);
 
   const handleCreateClick = () => {
-    setView('create');
+    setEditId(null);
+    setView('form');
   };
 
-  const handleCancelCreate = () => {
+  const handleEditClick = (id) => {
+    setEditId(id);
+    setView('form');
+  };
+
+  const handleCloseForm = () => {
+    setEditId(null);
     setView('list');
   };
 
   return (
     <div className="p-6 max-w-[1600px] mx-auto">
       {view === 'list' ? (
-        <ObligationList onCreateClick={handleCreateClick} />
+        <ObligationList
+          onCreateClick={handleCreateClick}
+          onEditClick={handleEditClick}
+        />
       ) : (
-        <CreateObligation onCancel={handleCancelCreate} />
+        <CreateObligation
+          onCancel={handleCloseForm}
+          editId={editId}
+        />
       )}
     </div>
   );

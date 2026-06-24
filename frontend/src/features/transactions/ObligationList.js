@@ -8,7 +8,7 @@ import EmptyState from '../../components/common/EmptyState';
 import { obligationAPI, monitoringAPI } from '../../services/api';
 import { formatPHP } from '../../utils/formatters';
 
-const ObligationList = ({ onCreateClick }) => {
+const ObligationList = ({ onCreateClick, onEditClick }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
   const [obData, setObData] = useState([]);

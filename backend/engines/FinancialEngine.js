@@ -158,7 +158,8 @@ class FinancialEngine {
       },
       officeBreakdown,
       prs: allPRs.filter(p => p.mooe_id && mooeIds.includes(p.mooe_id) && ['Approved', 'Partially Obligated', 'Obligated'].includes(p.workflow_status)),
-      obligations: papObligations
+      obligations: papObligations,
+      psRecords: psRecords
     };
   }
 

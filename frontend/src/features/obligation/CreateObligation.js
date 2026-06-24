@@ -61,7 +61,7 @@ const CreateObligation = ({ onNavigate }) => {
     setSelectedPr(pr);
     setPrNumber(pr.prno);
     setAmount(pr.remaining_amount);
-    setParticulars(\`Obligation for \${pr.prno}: \${pr.name || ''}\`);
+    setParticulars(`Obligation for ${pr.prno}: ${pr.name || ''}`);
     setShowPrList(false);
   };
 
@@ -148,10 +148,10 @@ const CreateObligation = ({ onNavigate }) => {
                 <button
                   key={label}
                   onClick={() => setIsDirect(val)}
-                  className={\`
+                  className={`
                     px-4 py-1.5 text-[12px] font-medium rounded-lg transition-all duration-150
-                    \${isDirect === val ? "bg-white text-emerald-700 shadow-sm" : "text-slate-500 hover:text-slate-700"}
-                  \`}
+                    ${isDirect === val ? "bg-white text-emerald-700 shadow-sm" : "text-slate-500 hover:text-slate-700"}
+                  `}
                 >
                   {label}
                 </button>
@@ -257,9 +257,9 @@ const CreateObligation = ({ onNavigate }) => {
               <h3 className="text-[13px] font-semibold text-slate-800">Budget Impact</h3>
             </div>
             <div className="space-y-2.5 pt-3 border-t border-slate-100">
-              <div className={\`p-3 rounded-xl border flex justify-between items-center \${overBudget ? "bg-red-50 border-red-100" : "bg-emerald-50/60 border-emerald-100"}\`}>
-                <span className={\`text-[10px] font-medium uppercase tracking-wider \${overBudget ? "text-red-700" : "text-emerald-700"}\`}>Remaining After</span>
-                <span className={\`text-[13px] font-bold font-mono \${overBudget ? "text-red-700" : "text-emerald-700"}\`}>₱{formatPHP(Math.abs(remainingAfter))}</span>
+              <div className={`p-3 rounded-xl border flex justify-between items-center ${overBudget ? "bg-red-50 border-red-100" : "bg-emerald-50/60 border-emerald-100"}`}>
+                <span className={`text-[10px] font-medium uppercase tracking-wider ${overBudget ? "text-red-700" : "text-emerald-700"}`}>Remaining After</span>
+                <span className={`text-[13px] font-bold font-mono ${overBudget ? "text-red-700" : "text-emerald-700"}`}>₱{formatPHP(Math.abs(remainingAfter))}</span>
               </div>
               {overBudget && (
                 <div className="flex items-start gap-2 p-2.5 bg-red-50 border border-red-100 text-red-600 rounded-xl text-[11px]">

@@ -139,24 +139,50 @@ class FilterEngine {
     });
 
     // PS Hierarchy
-    let psSql = "SELECT DISTINCT pap_type, pap_des FROM vw_ps_details";
+    let psSql = `
+      SELECT
+        id,
+        pap_type_code, pap_type,
+        pap_des_code, pap_des,
+        expense_items as label
+      FROM vw_ps_details
+      WHERE 1=1
+    `;
     const psValues = [];
     if (plan_id) {
         if (/^20\d{2}$/.test(String(plan_id))) {
-            psSql += " WHERE plan_id LIKE ?";
+            psSql += " AND plan_id LIKE ?";
             psValues.push(`%${plan_id}%`);
         } else {
-            psSql += " WHERE plan_id = ?";
+            psSql += " AND plan_id = ?";
             psValues.push(plan_id);
         }
     }
 
     const [psRows] = await pool.execute(psSql, psValues);
     const psHierarchy = {};
-    psRows.forEach(r => {
-        const type = r.pap_type;
-        if (!psHierarchy[type]) psHierarchy[type] = [];
-        psHierarchy[type].push(r.pap_des);
+    psRows.forEach(row => {
+        const papTypeCode = row.pap_type_code || '00000';
+        const papType = row.pap_type || 'Uncategorized';
+        const typeKey = `${papTypeCode}|${papType}`;
+
+        const papDesCode = row.pap_des_code || '00000';
+        const papDes = row.pap_des || 'Unnamed PAP';
+        const desKey = `${papDesCode}|${papDes}`;
+
+        const expenseItem = row.label || 'Uncategorized';
+
+        if (!psHierarchy[typeKey]) psHierarchy[typeKey] = {};
+        if (!psHierarchy[typeKey][desKey]) psHierarchy[typeKey][desKey] = {};
+
+        if (!psHierarchy[typeKey][desKey][expenseItem]) {
+            psHierarchy[typeKey][desKey][expenseItem] = [];
+        }
+
+        psHierarchy[typeKey][desKey][expenseItem].push({
+            id: row.id,
+            label: expenseItem
+        });
     });
 
     return {
