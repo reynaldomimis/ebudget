@@ -85,6 +85,16 @@ class PrController {
     }
   }
 
+  static async finalize(req, res) {
+    try {
+      const { id } = req.params;
+      const result = await PRService.finalizePR(id, req.headers['x-user-id']);
+      res.json(result);
+    } catch (error) {
+      handleError(error, res);
+    }
+  }
+
   static async reject(req, res) {
     try {
       const { id } = req.params;

@@ -10,6 +10,7 @@ router.delete("/:id", PrController.delete);
 
 router.post("/:id/submit", PrController.submit);
 router.post("/:id/approve", PrController.approve);
+router.post("/:id/finalize", PrController.finalize);
 router.post("/:id/reject", PrController.reject);
 
 module.exports = router;

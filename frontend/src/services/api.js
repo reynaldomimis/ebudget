@@ -43,7 +43,7 @@ export const financialAPI = {
   getExecutiveSummary: () => api.get("/financial/summary/executive"),
   getPapSummary: (planId) => api.get("/financial/summary/pap", { params: { plan_id: planId } }),
   getPapDetail: (params) => api.get("/financial/pap-detail", { params }),
-  getBudgetRegistry: () => api.get("/financial/registry"),
+  getBudgetRegistry: (planId) => api.get("/financial/registry", { params: { plan_id: planId } }),
   getFilters: (params) => api.get("/financial/filters", { params }),
   getBalance: (id, type) => api.get("/financial/balance", { params: { id, type } }),
 };
@@ -75,6 +75,7 @@ export const prAPI = {
   delete: (id) => api.delete(`/pr/${id}`),
   submit: (id) => api.post(`/pr/${id}/submit`),
   approve: (id) => api.post(`/pr/${id}/approve`),
+  finalize: (id) => api.post(`/pr/${id}/finalize`),
   reject: (id, remarks) => api.post(`/pr/${id}/reject`, { remarks }),
 };
 

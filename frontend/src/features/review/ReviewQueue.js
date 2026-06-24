@@ -14,6 +14,7 @@ import { prAPI, monitoringAPI } from "../../services/api";
 import { formatPHP } from "../../utils/formatters";
 import ToastService from "../../services/ToastService";
 import EmptyState from "../../components/common/EmptyState";
+import RemarksModal from "../../components/common/RemarksModal";
 
 const QueueItem = ({ row, onAction }) => {
   const insufficient = row.remaining_balance < row.pr_amount;
@@ -39,7 +40,7 @@ const QueueItem = ({ row, onAction }) => {
             </h4>
             <div className="flex items-center gap-4 mt-1.5">
               <div className="flex items-center gap-1 text-[11px] text-slate-400">
-                <Clock size={11} /> Submitted {new Date(row.transaction_date).toLocaleDateString()}
+                <Clock size={11} /> Submitted {row.created_at ? new Date(row.created_at).toLocaleDateString() : (row.transaction_date ? new Date(row.transaction_date).toLocaleDateString() : 'N/A')}
               </div>
             </div>
           </div>
@@ -80,7 +81,7 @@ const QueueItem = ({ row, onAction }) => {
             onClick={() => onAction(row.id, 'approve')}
             className="flex items-center gap-1.5 px-5 py-2 bg-emerald-500 text-white hover:bg-emerald-600 rounded-xl text-[11px] font-medium transition-colors shadow-sm shadow-emerald-200"
           >
-            <CheckCircle2 size={14} /> Approve
+            <CheckCircle2 size={14} /> Review
           </button>
         </div>
       </div>
@@ -92,6 +93,7 @@ const ReviewQueue = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [loading, setLoading] = useState(true);
   const [items, setItems] = useState([]);
+  const [remarksModal, setRemarksModal] = useState({ isOpen: false, prId: null });
 
   useEffect(() => {
     fetchQueue();
@@ -115,16 +117,24 @@ const ReviewQueue = () => {
     try {
       if (action === 'approve') {
         await prAPI.approve(id);
-        ToastService.toastSuccess("PR approved successfully");
+        ToastService.toastSuccess("PR moved to Approval Queue");
       } else {
-        const remarks = window.prompt("Enter rejection remarks:");
-        if (remarks === null) return;
-        await prAPI.reject(id, remarks);
-        ToastService.toastSuccess("PR rejected");
+        setRemarksModal({ isOpen: true, prId: id });
+        return;
       }
       fetchQueue();
     } catch (err) {
       ToastService.toastError(err.message || "Action failed");
+    }
+  };
+
+  const handleRejectSubmit = async (remarks) => {
+    try {
+      await prAPI.reject(remarksModal.prId, remarks);
+      ToastService.toastSuccess("PR rejected");
+      fetchQueue();
+    } catch (err) {
+      ToastService.toastError(err.message || "Failed to reject PR");
     }
   };
 
@@ -183,6 +193,16 @@ const ReviewQueue = () => {
           )}
         </div>
       )}
+
+      <RemarksModal
+        isOpen={remarksModal.isOpen}
+        onClose={() => setRemarksModal({ isOpen: false, prId: null })}
+        onSubmit={handleRejectSubmit}
+        title="Technical Review Feedback"
+        subtitle="Provide technical grounds for the return or rejection of this PR"
+        placeholder="Enter technical remarks here..."
+        buttonLabel="Submit Rejection"
+      />
     </div>
   );
 };

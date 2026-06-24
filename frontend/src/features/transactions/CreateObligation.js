@@ -8,9 +8,9 @@ import TransactionFilterEngine from '../../services/TransactionFilterEngine';
 import { FormField, Input, Textarea } from '../../components/common/FormControls';
 import BudgetFilters from '../../components/common/BudgetFilters';
 
-const CreateObligation = ({ onCancel }) => {
-  const [sourceMode, setSourceMode] = useState('DIRECT');
-  const [prSearch, setPrSearch] = useState('');
+const CreateObligation = ({ onCancel, prNo }) => {
+  const [sourceMode, setSourceMode] = useState(prNo ? 'PR' : 'DIRECT');
+  const [prSearch, setPrSearch] = useState(prNo || '');
   const [selectedPR, setSelectedPR] = useState(null);
   const [showPRList, setShowPRList] = useState(false);
   const [obDate, setObDate] = useState(new Date().toISOString().split('T')[0]);
@@ -18,6 +18,25 @@ const CreateObligation = ({ onCancel }) => {
   const [allotmentClass, setAllotmentClass] = useState('MOOE');
   const [obNo, setObNo] = useState('Loading...');
   const [availablePRs, setAvailablePRs] = useState([]);
+
+  // Auto-select PR if passed from props
+  useEffect(() => {
+    if (prNo && availablePRs.length > 0 && !selectedPR) {
+      const found = availablePRs.find(pr => pr.id === prNo);
+      if (found) {
+        // Logic from handleSelectPR but inside effect
+        setSelectedPR(found);
+        setPrSearch(found.id);
+        setPayee(found.supplier);
+        setItems([{
+          id: Date.now(),
+          objectCode: '',
+          particulars: `Obligation for ${found.id}: ${found.purpose}`,
+          amount: found.remaining
+        }]);
+      }
+    }
+  }, [availablePRs, prNo, selectedPR]);
 
   const [selection, setSelection] = useState({});
   const [availableAllocation, setAvailableAllocation] = useState(0);
@@ -42,12 +61,12 @@ const CreateObligation = ({ onCancel }) => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Load Allocation and Next OBR No / Real PRs
   useEffect(() => {
     const initData = async () => {
       try {
+        const year = new Date(obDate).getFullYear();
         const [regRes, nextNoRes] = await Promise.all([
-          financialAPI.getBudgetRegistry(),
+          financialAPI.getBudgetRegistry(year),
           obligationAPI.getNextNo(new Date().getFullYear().toString(), (new Date().getMonth() + 1).toString().padStart(2, '0'))
         ]);
 
@@ -56,13 +75,13 @@ const CreateObligation = ({ onCancel }) => {
             (item.prs || []).map(pr => ({
               id: pr.prno,
               amount: pr.pr_amount,
-              remaining: pr.remaining_balance,
+              remaining: pr.remaining_amount !== undefined ? pr.remaining_amount : pr.remaining_balance,
               purpose: pr.purpose,
               supplier: pr.payee || 'N/A',
               mooe_id: item.id,
               status: pr.workflow_status
             }))
-          ).filter(pr => pr.remaining > 0 && ['Approved', 'Partially Obligated'].includes(pr.status));
+          ).filter(pr => Number(pr.remaining) > 0 && ['approved', 'partially obligated'].includes(String(pr.status).toLowerCase()));
           setAvailablePRs(prs);
         }
         if (nextNoRes.success) setObNo(nextNoRes.nextObrNo);
@@ -211,6 +230,16 @@ const CreateObligation = ({ onCancel }) => {
     }]);
   };
 
+  const handleSearchPR = () => {
+    if (!prSearch.trim()) return;
+    const found = availablePRs.find(pr => pr.id.toLowerCase() === prSearch.trim().toLowerCase());
+    if (found) {
+      handleSelectPR(found);
+    } else {
+      alert("PR Number not found among approved requests with balance.");
+    }
+  };
+
   const addEntry = () => {
     setItems([...items, { id: Date.now(), objectCode: '', particulars: '', amount: 0 }]);
   };
@@ -233,12 +262,12 @@ const CreateObligation = ({ onCancel }) => {
   );
 
   const isFormValid = payee.trim() !== '' &&
-                     (allotmentClass === 'PS' ? selection.papDes !== '' : selection.activityId !== '') &&
+                     (sourceMode === 'PR' ? !!selectedPR : (allotmentClass === 'PS' ? selection.papDes !== '' : selection.mooeId !== '')) &&
                      items.every(i => i.particulars.trim() !== '' && i.amount > 0) &&
                      totalAmount > 0 &&
-                     totalAmount <= availableAllocation;
+                     totalAmount <= (sourceMode === 'PR' ? (selectedPR?.remaining || 0) : availableAllocation);
 
-  const isDirectValid = sourceMode === 'DIRECT' && (allotmentClass === 'PS' ? !!selection.papDes : !!selection.activityId);
+  const isDirectValid = sourceMode === 'DIRECT' && (allotmentClass === 'PS' ? !!selection.papDes : !!selection.mooeId);
   const isPrValid = sourceMode === 'PR' && !!selectedPR;
   const canEditDetails = isDirectValid || isPrValid;
 
@@ -296,7 +325,13 @@ const CreateObligation = ({ onCancel }) => {
                     <button onClick={() => setShowPRList(!showPRList)} className="flex items-center gap-1.5 px-4 h-[48px] bg-white text-emerald-600 border-2 border-emerald-600 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-50 shadow-sm transition-all active:scale-95">
                       <List size={16} strokeWidth={3} /> BROWSE PRS
                     </button>
-                    <button className="px-8 h-[48px] bg-emerald-600 text-white rounded-xl text-sm font-black uppercase tracking-wide hover:bg-emerald-700 shadow-lg shadow-emerald-900/20 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:grayscale" disabled={!prSearch.trim()}>Search PR</button>
+                    <button
+                      onClick={handleSearchPR}
+                      className="px-8 h-[48px] bg-emerald-600 text-white rounded-xl text-sm font-black uppercase tracking-wide hover:bg-emerald-700 shadow-lg shadow-emerald-900/20 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:grayscale"
+                      disabled={!prSearch.trim()}
+                    >
+                      Search PR
+                    </button>
                   </div>
                </div>
 
@@ -519,12 +554,12 @@ const CreateObligation = ({ onCancel }) => {
               <div className="p-4 bg-emerald-50 rounded-xl border border-emerald-100">
                 <div className="flex justify-between items-center mb-2">
                   <span className="text-[10px] font-black text-emerald-700 uppercase tracking-widest">Available Allocation</span>
-                  <span className="text-sm font-black text-emerald-900 font-mono">₱{formatPHP(availableAllocation)}</span>
+                  <span className="text-sm font-black text-emerald-900 font-mono">₱{formatPHP(sourceMode === 'PR' ? 0 : availableAllocation)}</span>
                 </div>
                 <div className="w-full h-2 bg-emerald-200 rounded-full overflow-hidden">
-                   <div className={`h-full transition-all duration-700 ${totalAmount > availableAllocation ? 'bg-rose-500' : 'bg-emerald-500'}`} style={{ width: `${availableAllocation > 0 ? Math.min((totalAmount / availableAllocation) * 100, 100) : 0}%` }}></div>
+                   <div className={`h-full transition-all duration-700 ${sourceMode === 'PR' ? 'bg-neutral-300' : (totalAmount > availableAllocation ? 'bg-rose-500' : 'bg-emerald-500')}`} style={{ width: `${sourceMode === 'PR' ? 0 : (availableAllocation > 0 ? Math.min((totalAmount / availableAllocation) * 100, 100) : 0)}%` }}></div>
                 </div>
-                {totalAmount > availableAllocation && availableAllocation > 0 && (
+                {sourceMode === 'DIRECT' && totalAmount > availableAllocation && availableAllocation > 0 && (
                   <p className="text-[10px] text-rose-600 font-black mt-2 flex items-center gap-1 uppercase tracking-widest">
                     <AlertCircle size={12} /> Amount exceeds allocation
                   </p>

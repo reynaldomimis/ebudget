@@ -165,8 +165,21 @@ class FinancialEngine {
 
   static async getBudgetRegistry(plan_id) {
     if (!plan_id) plan_id = await FiscalYearContext.getActivePlanId();
-    const [mooeItems] = await pool.query("SELECT * FROM vw_mooe_excel_full_report WHERE plan_id = ? OR plan_year = ?", [plan_id, plan_id]);
-    const [psRecords] = await pool.query("SELECT * FROM vw_ps_details WHERE plan_id = ? OR fiscal_year = ?", [plan_id, plan_id]);
+
+    let year = plan_id;
+    if (String(plan_id).includes('-')) {
+        const parts = String(plan_id).split('-');
+        year = parts.find(p => /^20\d{2}$/.test(p)) || plan_id;
+    }
+
+    const [mooeItems] = await pool.query(
+        "SELECT * FROM vw_mooe_excel_full_report WHERE plan_id = ? OR plan_year = ? OR plan_id LIKE ?",
+        [plan_id, year, `%${year}%`]
+    );
+    const [psRecords] = await pool.query(
+        "SELECT * FROM vw_ps_details WHERE plan_id = ? OR fiscal_year = ? OR plan_id LIKE ?",
+        [plan_id, year, `%${year}%`]
+    );
     const [allPRs] = await pool.query("SELECT * FROM vw_pr_details");
     const [allObligations] = await pool.query("SELECT * FROM vw_obligation_details");
     const registry = [];
@@ -179,13 +192,13 @@ class FinancialEngine {
         const obligated = obligations.reduce((sum, o) => sum + Number(o.amount), 0);
         return { ...pr, obligated_amount: obligated, remaining_amount: Number(pr.pr_amount) - obligated };
       });
-      const directObligations = allObligations.filter(o => o.allotment_class === 'MOOE' && o.id === item.id && !o.prno);
+      const directObligations = allObligations.filter(o => o.allotment_class === 'MOOE' && o.mooe_id === item.id && !o.prno);
       const totalObligated = prSummaries.reduce((sum, p) => sum + p.obligated_amount, 0) + directObligations.reduce((sum, o) => sum + Number(o.amount), 0);
       registry.push({ ...item, allotment_class: 'MOOE', prs: prSummaries, directObligations, totalObligated, remainingBalance: Number(item.total_amount) - totalObligated });
     }
 
     for (const record of psRecords) {
-      const directObligations = allObligations.filter(o => o.allotment_class === 'PS' && o.id === record.id);
+      const directObligations = allObligations.filter(o => o.allotment_class === 'PS' && o.ps_id === record.id);
       const totalObligated = directObligations.reduce((sum, o) => sum + Number(o.amount), 0);
       registry.push({ ...record, allotment_class: 'PS', prs: [], directObligations, totalObligated, remainingBalance: Number(record.amount) - totalObligated });
     }

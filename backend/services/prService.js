@@ -102,6 +102,25 @@ class PRService {
 
       if (!pr) throw new Error("PR not found");
       if (pr.workflow_status !== "For Review") {
+        throw new Error(`Invalid transition from ${pr.workflow_status} to Reviewed`);
+      }
+
+      await PRRepository.updateStatus(id, "Reviewed", null, connection);
+      CacheEngine.invalidate("exec_summary");
+      CacheEngine.invalidate("workflow_summary");
+      await AuditEngine.log("PR_REVIEWED", { id, prno: pr.prno, old_status: pr.workflow_status, new_status: "Reviewed" }, userId, 'PR', id);
+      return { success: true };
+    });
+  }
+
+  static async finalizePR(id, userId = null) {
+    return await TransactionEngine.execute(async (connection) => {
+      const { pool } = require("../config/database");
+      const [rows] = await pool.execute("SELECT workflow_status, prno FROM vw_pr_details WHERE id = ?", [id]);
+      const pr = rows[0];
+
+      if (!pr) throw new Error("PR not found");
+      if (pr.workflow_status !== "Reviewed") {
         throw new Error(`Invalid transition from ${pr.workflow_status} to Approved`);
       }
 

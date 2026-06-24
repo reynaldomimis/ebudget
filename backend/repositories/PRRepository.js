@@ -31,7 +31,7 @@ class PRRepository {
   static async update(id, prData, connection = pool) {
     const query = `
       UPDATE pr_so
-      SET mooe_id = ?, prno = ?, amount = ?, purpose = ?
+      SET mooe_id = ?, prno = ?, amount = ?, purpose = ?, workflow_status = ?
       WHERE id = ?
     `;
     const [result] = await connection.execute(query, [
@@ -39,6 +39,7 @@ class PRRepository {
       prData.prno,
       prData.amount || 0,
       prData.purpose,
+      prData.workflow_status || 'Draft',
       id,
     ]);
     return result;

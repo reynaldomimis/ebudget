@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard,
@@ -11,49 +11,10 @@ import {
   ChevronRight,
   LogOut,
 } from 'lucide-react';
+import { monitoringAPI } from '../../services/api';
+import { useFiscalYear } from '../../context/FiscalYearContext';
 
-const NAV_ITEMS = [
-  {
-    id: 'dashboard',
-    label: 'Dashboard',
-    icon: LayoutDashboard,
-  },
-  {
-    id: 'budget',
-    label: 'Budget Registry',
-    icon: BookOpen,
-    section: 'Budget',
-    subItems: [
-      { id: 'registry', label: 'Overview' },
-      { id: 'import', label: 'Import Budget' },
-    ],
-  },
-  {
-    id: 'transactions',
-    label: 'Transactions',
-    icon: ArrowLeftRight,
-    section: 'Transactions',
-    subItems: [
-      { id: 'create-pr', label: 'Purchase Requests' },
-      { id: 'create-obligation', label: 'Obligation Register' },
-    ],
-  },
-  {
-    id: 'workflow',
-    label: 'Workflow',
-    icon: ClipboardList,
-    badge: 5,
-    subItems: [
-      { id: 'review-queue', label: 'Review Queue' },
-      { id: 'approval-queue', label: 'Approval Queue' },
-    ],
-  },
-  { id: 'monitoring', label: 'Monitoring', icon: Activity, dividerBefore: true },
-  { id: 'reports', label: 'Reports', icon: BarChart3 },
-  { id: 'admin', label: 'Administration', icon: ShieldCheck },
-];
-
-const SubItem = ({ id, label, isActive, onClick }) => (
+const SubItem = ({ id, label, badge, isActive, onClick }) => (
   <button
     onClick={() => onClick(id)}
     className={`
@@ -65,7 +26,12 @@ const SubItem = ({ id, label, isActive, onClick }) => (
     `}
   >
     <span className={`w-1 h-1 rounded-full flex-shrink-0 ${isActive ? 'bg-emerald-400' : 'bg-slate-600'}`} />
-    {label}
+    <span className="flex-1">{label}</span>
+    {badge && (
+      <span className="text-[9px] font-bold text-slate-400">
+        {badge}
+      </span>
+    )}
   </button>
 );
 
@@ -123,6 +89,7 @@ const NavItem = ({ item, isActive, isOpen, onToggle, onNavigate, collapsed, curr
               key={sub.id}
               id={sub.id}
               label={sub.label}
+              badge={sub.badge}
               isActive={currentPath === sub.id}
               onClick={onNavigate}
             />
@@ -136,9 +103,74 @@ const NavItem = ({ item, isActive, isOpen, onToggle, onNavigate, collapsed, curr
 const Sidebar = ({ collapsed = false }) => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { selectedYear } = useFiscalYear();
   const currentPath = location.pathname.substring(1) || 'dashboard';
 
-  const [openMenus, setOpenMenus] = useState(['budget', 'transactions']);
+  const [openMenus, setOpenMenus] = useState(['budget', 'transactions', 'workflow']);
+  const [counts, setCounts] = useState({ review: 0, approval: 0, total: 0 });
+
+  useEffect(() => {
+    const fetchWorkflowCounts = async () => {
+      try {
+        const res = await monitoringAPI.getWorkflowSummary(selectedYear);
+        if (res.success) {
+          const { forReview = 0, approved = 0, partiallyObligated = 0 } = res.data;
+          setCounts({
+            review: forReview,
+            approval: approved + partiallyObligated,
+            total: forReview + approved + partiallyObligated
+          });
+        }
+      } catch (err) {
+        console.error("Failed to fetch sidebar counts:", err);
+      }
+    };
+
+    fetchWorkflowCounts();
+    const interval = setInterval(fetchWorkflowCounts, 30000);
+    return () => clearInterval(interval);
+  }, [selectedYear, location.pathname]);
+
+  const NAV_ITEMS = [
+    {
+      id: 'dashboard',
+      label: 'Dashboard',
+      icon: LayoutDashboard,
+    },
+    {
+      id: 'budget',
+      label: 'Budget Registry',
+      icon: BookOpen,
+      section: 'Budget',
+      subItems: [
+        { id: 'registry', label: 'Overview' },
+        { id: 'import', label: 'Import Budget' },
+      ],
+    },
+    {
+      id: 'transactions',
+      label: 'Transactions',
+      icon: ArrowLeftRight,
+      section: 'Transactions',
+      subItems: [
+        { id: 'create-pr', label: 'Purchase Requests' },
+        { id: 'create-obligation', label: 'Obligation Register' },
+      ],
+    },
+    {
+      id: 'workflow',
+      label: 'Workflow',
+      icon: ClipboardList,
+      badge: counts.total > 0 ? counts.total : null,
+      subItems: [
+        { id: 'review-queue', label: 'Review Queue', badge: counts.review > 0 ? counts.review : null },
+        { id: 'approval-queue', label: 'Approval Queue', badge: counts.approval > 0 ? counts.approval : null },
+      ],
+    },
+    { id: 'monitoring', label: 'Monitoring', icon: Activity, dividerBefore: true },
+    { id: 'reports', label: 'Reports', icon: BarChart3 },
+    { id: 'admin', label: 'Administration', icon: ShieldCheck },
+  ];
 
   const toggleMenu = (id) => {
     setOpenMenus((prev) =>

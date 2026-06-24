@@ -5,6 +5,7 @@ const statusConfig = {
   'Draft': { bg: 'bg-neutral-100', text: 'text-neutral-600' },
   'For Review': { bg: 'bg-amber-50', text: 'text-amber-700' },
   'For Approval': { bg: 'bg-blue-50', text: 'text-blue-700' },
+  'Reviewed': { bg: 'bg-blue-50', text: 'text-blue-700' },
   'Approved': { bg: 'bg-emerald-50', text: 'text-emerald-700' },
   'Rejected': { bg: 'bg-rose-50', text: 'text-rose-700' },
   'Partially Obligated': { bg: 'bg-blue-50', text: 'text-blue-700' },

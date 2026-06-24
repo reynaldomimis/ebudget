@@ -4,13 +4,9 @@ const { pool } = require("../config/database");
 
 async function describe() {
   try {
-    const [mooe] = await pool.execute("DESCRIBE mooe");
-    console.log("=== MOOE TABLE ===");
-    console.table(mooe);
-
-    const [ps] = await pool.execute("DESCRIBE ps");
-    console.log("\n=== PS TABLE ===");
-    console.table(ps);
+    const [pr_so] = await pool.execute("DESCRIBE pr_so");
+    console.log("=== PR_SO TABLE ===");
+    console.table(pr_so);
 
   } catch (err) {
     console.error(err);

@@ -42,9 +42,9 @@ const PRDetailsModal = ({ isOpen, onClose, prId }) => {
   // PREMIUM UI CONTENT
   const modalContent = (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center p-0 sm:p-6 animate-in fade-in duration-200">
-      {/* Backdrop with Glassmorphism */}
+      {/* Backdrop with Glassmorphism - Adjusted blur to be less blurred as requested */}
       <div
-        className="absolute inset-0 bg-slate-900/60 backdrop-blur-md transition-opacity"
+        className="absolute inset-0 bg-slate-900/50 backdrop-blur-[6px] transition-opacity"
         onClick={onClose}
       />
 

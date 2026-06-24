@@ -1,17 +1,36 @@
 import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Plus, Download, Search, Eye, Edit, RotateCcw, Send, CheckCircle, XCircle, Wallet, Trash2 } from "lucide-react";
 import PageHeader from "../../components/common/PageHeader";
 import DataTable from "../../components/common/DataTable";
 import Button from "../../components/common/Button";
 import StatusBadge from "../../components/common/StatusBadge";
 import ToastService from "../../services/ToastService";
+import RemarksModal from "../../components/common/RemarksModal";
 import { prAPI, monitoringAPI } from "../../services/api";
 import { formatPHP } from "../../utils/formatters";
 
-const PRList = ({ onNavigate }) => {
+const PRList = ({ onNavigate, onCreateClick, onEditClick }) => {
+  const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
   const [loading, setLoading] = useState(true);
   const [prData, setPrData] = useState([]);
+  const [remarksModal, setRemarksModal] = useState({ isOpen: false, prId: null });
+
+  // Internal navigation handler that respects props or uses router
+  const handleNavigate = (path, state) => {
+    if (path === 'create-pr' && onCreateClick) {
+        onCreateClick();
+        return;
+    }
+    if (path === 'edit-pr' && onEditClick) {
+        onEditClick(state.id);
+        return;
+    }
+
+    // Default to global router navigation
+    navigate(`/${path}`, { state });
+  };
 
   useEffect(() => {
     fetchPRs();
@@ -50,10 +69,12 @@ const PRList = ({ onNavigate }) => {
   };
 
   const handleReject = async (id) => {
-    const remarks = window.prompt("Enter rejection remarks:");
-    if (remarks === null) return;
+    setRemarksModal({ isOpen: true, prId: id });
+  };
+
+  const handleRejectSubmit = async (remarks) => {
     try {
-      await prAPI.reject(id, remarks);
+      await prAPI.reject(remarksModal.prId, remarks);
       ToastService.toastSuccess("PR rejected");
       fetchPRs();
     } catch (err) {
@@ -73,10 +94,10 @@ const PRList = ({ onNavigate }) => {
     },
     {
       header: "DATE",
-      accessor: "transaction_date",
+      accessor: "created_at",
       render: (row) => (
         <span className="text-[12px] text-slate-500">
-          {row.transaction_date ? new Date(row.transaction_date).toLocaleDateString() : 'N/A'}
+          {row.created_at ? new Date(row.created_at).toLocaleDateString() : (row.transaction_date ? new Date(row.transaction_date).toLocaleDateString() : 'N/A')}
         </span>
       ),
     },
@@ -153,7 +174,7 @@ const PRList = ({ onNavigate }) => {
               <button
                 className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
                 title="Edit PR"
-                onClick={() => onNavigate('edit-pr', { id: row.id })}
+                onClick={() => handleNavigate('edit-pr', { id: row.id })}
               >
                 <Edit size={15} />
               </button>
@@ -171,7 +192,7 @@ const PRList = ({ onNavigate }) => {
              <>
                <button
                  className="p-1.5 rounded-lg text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 transition-colors"
-                 title="Approve PR"
+                 title="Review PR"
                  onClick={() => handleApprove(row.id)}
                >
                  <CheckCircle size={15} />
@@ -186,11 +207,11 @@ const PRList = ({ onNavigate }) => {
              </>
           )}
 
-          {(row.workflow_status === 'Approved' || row.workflow_status === 'Partially Obligated') && (
+          {(row.workflow_status === 'Reviewed' || row.workflow_status === 'Approved' || row.workflow_status === 'Partially Obligated') && (
             <button
               className="p-1.5 rounded-lg text-emerald-600 bg-emerald-50 hover:bg-emerald-100 transition-colors"
               title="Create Obligation"
-              onClick={() => onNavigate('create-obligation', { prno: row.prno })}
+              onClick={() => handleNavigate('create-obligation', { prno: row.prno })}
             >
               <Wallet size={15} className="mr-1 inline" />
               <span className="text-[10px] font-bold uppercase">Obligate</span>
@@ -222,7 +243,7 @@ const PRList = ({ onNavigate }) => {
               variant="primary"
               icon={Plus}
               size="sm"
-              onClick={() => onNavigate("create-pr")}
+              onClick={() => handleNavigate("create-pr")}
             >
               Create PR
             </Button>
@@ -257,6 +278,16 @@ const PRList = ({ onNavigate }) => {
         columns={columns}
         data={filtered}
         loading={loading}
+      />
+
+      <RemarksModal
+        isOpen={remarksModal.isOpen}
+        onClose={() => setRemarksModal({ isOpen: false, prId: null })}
+        onSubmit={handleRejectSubmit}
+        title="Purchase Request Rejection"
+        subtitle="State the administrative or technical reason for this rejection"
+        placeholder="Enter rejection remarks here..."
+        buttonLabel="Confirm Rejection"
       />
     </div>
   );

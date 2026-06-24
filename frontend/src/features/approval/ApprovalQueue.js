@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   ShieldCheck,
   Search,
@@ -10,13 +11,19 @@ import {
   TrendingDown,
   Loader2,
   Wallet,
+  Clock,
 } from "lucide-react";
-import { prAPI } from "../../services/api";
+import { prAPI, monitoringAPI } from "../../services/api";
 import { formatPHP } from "../../utils/formatters";
+import ToastService from "../../services/ToastService";
 import EmptyState from "../../components/common/EmptyState";
 
-const ApprovalQueueItem = ({ row, onNavigate }) => {
-  const impactPct = ((row.pr_amount / (row.remaining_balance + row.pr_amount)) * 100).toFixed(1);
+const ApprovalQueueItem = ({ row, onNavigate, onApprove }) => {
+  const prAmount = Number(row.pr_amount) || 0;
+  const remBalance = Number(row.remaining_balance) || 0;
+  const impactPct = (prAmount + remBalance) > 0
+    ? ((prAmount / (remBalance + prAmount)) * 100).toFixed(1)
+    : "0.0";
 
   return (
     <div className="bg-white border border-slate-200/80 rounded-2xl p-5 hover:shadow-md hover:shadow-slate-900/5 transition-all duration-200">
@@ -28,11 +35,11 @@ const ApprovalQueueItem = ({ row, onNavigate }) => {
           <div>
             <div className="flex items-center flex-wrap gap-2 mb-1.5">
               <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider border ${
-                row.workflow_status === 'Approved'
+                (row.workflow_status === 'Approved' || row.workflow_status === 'Reviewed')
                   ? "text-blue-700 bg-blue-50 border-blue-100"
                   : "text-amber-700 bg-amber-50 border-amber-100"
               }`}>
-                {row.workflow_status === 'Approved' ? 'Approved PR' : 'Partial Obligation'}
+                {row.workflow_status === 'Reviewed' ? 'Reviewed PR' : row.workflow_status === 'Approved' ? 'Approved PR' : 'Partial Obligation'}
               </span>
               <span className="text-[10px] text-slate-400 font-medium">
                 PR NO: {row.prno}
@@ -43,7 +50,10 @@ const ApprovalQueueItem = ({ row, onNavigate }) => {
             </h4>
             <div className="flex items-center gap-4 mt-1.5">
               <div className="flex items-center gap-1 text-[11px] text-slate-400">
-                <History size={11} /> Ready for Obligation
+                <Clock size={11} /> Submitted {row.created_at ? new Date(row.created_at).toLocaleDateString() : (row.transaction_date ? new Date(row.transaction_date).toLocaleDateString() : 'N/A')}
+              </div>
+              <div className="flex items-center gap-1 text-[11px] text-slate-400">
+                <History size={11} /> {row.workflow_status === 'Reviewed' ? 'Waiting for Approval' : 'Ready for Obligation'}
               </div>
               <div className="flex items-center gap-1 text-[11px] font-medium text-emerald-600">
                 <Activity size={11} /> Funds Verified
@@ -53,27 +63,25 @@ const ApprovalQueueItem = ({ row, onNavigate }) => {
         </div>
 
         <div className="flex items-start gap-8 flex-shrink-0">
-          {[
-            {
-              label: "PR Amount",
-              val: formatPHP(row.pr_amount),
-              color: "text-slate-800",
-            },
-            {
-              label: "Unobligated",
-              val: formatPHP(row.remaining_balance),
-              color: "text-emerald-600",
-            },
-          ].map(({ label, val, color }) => (
-            <div key={label} className="text-right">
+          <div className="text-right">
+            <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wider mb-1">
+              PR Amount
+            </p>
+            <p className="text-[13px] font-semibold font-mono text-slate-800">
+              ₱{formatPHP(row.pr_amount)}
+            </p>
+          </div>
+
+          {row.workflow_status !== 'Reviewed' && (
+            <div className="text-right">
               <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wider mb-1">
-                {label}
+                Unobligated
               </p>
-              <p className={`text-[13px] font-semibold font-mono ${color}`}>
-                ₱{val}
+              <p className="text-[13px] font-semibold font-mono text-emerald-600">
+                ₱{formatPHP(row.remaining_balance)}
               </p>
             </div>
-          ))}
+          )}
         </div>
       </div>
 
@@ -87,7 +95,7 @@ const ApprovalQueueItem = ({ row, onNavigate }) => {
           </div>
           <p className="text-[12px] text-emerald-700 leading-relaxed">
             This request represents {impactPct}% of the linked allocation's remaining balance.
-            All technical reviews completed.
+            Technical review successfully completed.
           </p>
         </div>
       </div>
@@ -96,23 +104,33 @@ const ApprovalQueueItem = ({ row, onNavigate }) => {
         <div className="flex items-center gap-2">
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 flex-shrink-0" />
           <span className="text-[11px] text-slate-400">
-            Action: Formal Obligation Entry
+            {row.workflow_status === 'Reviewed' ? 'Action Required: Official Approval' : 'Action Required: Formal Obligation Entry'}
           </span>
         </div>
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => onNavigate('create-obligation', { prno: row.prno })}
-            className="flex items-center gap-1.5 px-5 py-2 bg-emerald-500 text-white hover:bg-emerald-600 rounded-xl text-[11px] font-medium transition-colors shadow-sm shadow-emerald-200"
-          >
-            <Wallet size={14} /> Create Obligation
-          </button>
+          {row.workflow_status === 'Reviewed' ? (
+            <button
+              onClick={() => onApprove(row.id)}
+              className="flex items-center gap-1.5 px-6 py-2 bg-blue-600 text-white hover:bg-blue-700 rounded-xl text-[11px] font-bold uppercase tracking-wider transition-all shadow-sm shadow-blue-200"
+            >
+              <CheckCircle2 size={14} /> Approve
+            </button>
+          ) : (
+            <button
+              onClick={() => onNavigate('create-obligation', { prno: row.prno })}
+              className="flex items-center gap-1.5 px-5 py-2 bg-emerald-500 text-white hover:bg-emerald-600 rounded-xl text-[11px] font-bold uppercase tracking-wider transition-all shadow-sm shadow-emerald-200"
+            >
+              <Wallet size={14} /> Create Obligation
+            </button>
+          )}
         </div>
       </div>
     </div>
   );
 };
 
-const ApprovalQueue = ({ onNavigate }) => {
+const ApprovalQueue = () => {
+  const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
   const [loading, setLoading] = useState(true);
   const [items, setItems] = useState([]);
@@ -124,15 +142,29 @@ const ApprovalQueue = ({ onNavigate }) => {
   const fetchQueue = async () => {
     try {
       setLoading(true);
-      const res = await prAPI.getAll();
+      const res = await monitoringAPI.getPRs();
       if (res.success) {
-        setItems((res.data || []).filter(pr => pr.workflow_status === 'Approved' || pr.workflow_status === 'Partially Obligated'));
+        setItems((res.data || []).filter(pr => pr.workflow_status === 'Reviewed' || pr.workflow_status === 'Approved' || pr.workflow_status === 'Partially Obligated'));
       }
     } catch (err) {
       console.error("Failed to fetch approval queue", err);
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleApprove = async (id) => {
+    try {
+      await prAPI.finalize(id);
+      ToastService.toastSuccess("PR Approved. Ready for Obligation.");
+      fetchQueue();
+    } catch (err) {
+      ToastService.toastError(err.message || "Approval failed");
+    }
+  };
+
+  const handleNavigateToObligation = (path, state) => {
+    navigate(`/${path}`, { state });
   };
 
   const filtered = items.filter(
@@ -183,7 +215,12 @@ const ApprovalQueue = ({ onNavigate }) => {
         <div className="space-y-3">
           {filtered.length > 0 ? (
             filtered.map((item) => (
-              <ApprovalQueueItem key={item.id} row={item} onNavigate={onNavigate} />
+              <ApprovalQueueItem
+                key={item.id}
+                row={item}
+                onNavigate={handleNavigateToObligation}
+                onApprove={handleApprove}
+              />
             ))
           ) : (
             <EmptyState message="No approved PRs currently waiting for obligation." />

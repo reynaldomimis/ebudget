@@ -109,6 +109,7 @@ const views = [
     `CREATE OR REPLACE VIEW vw_obligation_details AS
     SELECT
         o.id, o.obrno, o.prno, o.payee, o.particular, o.amount, o.created_at, YEAR(o.created_at) AS fiscal_year,
+        o.mooe_id, o.ps_id, o.pr_id,
         CASE WHEN o.mooe_id IS NOT NULL THEN 'MOOE' WHEN o.ps_id IS NOT NULL THEN 'PS' ELSE 'OTHER' END AS allotment_class,
         COALESCE(m.office, 'N/A') AS office, COALESCE(m.pap_type, p.pap_type) AS pap_type,
         COALESCE(m.pap_des, p.pap_des) AS pap_des, COALESCE(m.expense_items, p.expense_items) AS expense_item
