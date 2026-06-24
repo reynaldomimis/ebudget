@@ -109,11 +109,30 @@ const views = [
 
     `CREATE OR REPLACE VIEW vw_obligation_details AS
     SELECT
-        o.id, o.obrno, o.prno, o.payee, o.particular, o.amount, o.created_at, YEAR(o.created_at) AS fiscal_year,
+        o.id,
+        o.obrno,
+        o.prno,
+        o.payee,
+        o.particular,
+        o.amount,
+        o.transaction_date,
+        o.created_at,
+        YEAR(o.created_at) AS fiscal_year,
         CASE WHEN o.mooe_id IS NOT NULL THEN 'MOOE' WHEN o.ps_id IS NOT NULL THEN 'PS' ELSE 'OTHER' END AS allotment_class,
-        COALESCE(m.office, 'N/A') AS office, COALESCE(m.pap_type, p.pap_type) AS pap_type,
-        COALESCE(m.pap_des, p.pap_des) AS pap_des, COALESCE(m.expense_items, p.expense_items) AS expense_item
-    FROM obligation o LEFT JOIN mooe m ON o.mooe_id = m.id LEFT JOIN ps p ON o.ps_id = p.id WHERE o.is_deleted = 0;`,
+        COALESCE(m.office, 'N/A') AS office,
+        COALESCE(m.pap_type, p.pap_type) AS pap_type,
+        COALESCE(m.pap_des, p.pap_des) AS pap_des,
+        COALESCE(m.expense_items, p.expense_items) AS expense_item,
+        /* PR Context */
+        pr.amount AS pr_amount,
+        pr.workflow_status AS pr_status,
+        (SELECT COALESCE(SUM(ob.amount), 0) FROM obligation ob WHERE ob.pr_id = pr.id AND ob.is_deleted = 0) AS total_obligated,
+        (pr.amount - (SELECT COALESCE(SUM(ob.amount), 0) FROM obligation ob WHERE ob.pr_id = pr.id AND ob.is_deleted = 0)) AS remaining_balance
+    FROM obligation o
+    LEFT JOIN mooe m ON o.mooe_id = m.id
+    LEFT JOIN ps p ON o.ps_id = p.id
+    LEFT JOIN pr_so pr ON o.pr_id = pr.id
+    WHERE o.is_deleted = 0;`,
 
     `CREATE OR REPLACE VIEW vw_mooe_excel_full_report AS
     SELECT

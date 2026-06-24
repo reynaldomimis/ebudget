@@ -33,22 +33,23 @@ const ObligationList = ({ onCreateClick, onEditClick }) => {
     {
       header: 'OBR NO',
       accessor: 'obrno',
-      render: (row) => <span className="font-mono text-[12px] font-bold text-blue-700">{row.obrno}</span>
+      render: (row) => <span className="font-mono text-[11px] font-bold text-blue-700 whitespace-nowrap">{row.obrno}</span>
     },
     {
       header: 'DATE',
       accessor: 'transaction_date',
-      render: (row) => <span className="text-neutral-600 text-[12px]">{row.transaction_date ? new Date(row.transaction_date).toLocaleDateString() : 'N/A'}</span>
+      render: (row) => <span className="text-neutral-600 text-[12px]">{row.transaction_date ? new Date(row.transaction_date).toLocaleDateString() : (row.created_at ? new Date(row.created_at).toLocaleDateString() : 'N/A')}</span>
     },
     {
-        header: 'PR NO',
-        accessor: 'prno',
-        render: (row) => <span className="font-mono text-[11px] font-bold text-slate-500">{row.prno || "DIRECT"}</span>
-    },
-    {
-      header: 'PAYEE',
-      accessor: 'payee',
-      render: (row) => <span className="text-[12px] font-medium text-neutral-800">{row.payee || "N/A"}</span>
+      header: 'PARTICULARS',
+      accessor: 'particular',
+      render: (row) => (
+        <div className="max-w-[250px]">
+          <p className="text-[11px] font-medium text-neutral-800 line-clamp-2 leading-tight">
+            {row.particular || "No particulars provided"}
+          </p>
+        </div>
+      )
     },
     {
       header: 'AMOUNT',
